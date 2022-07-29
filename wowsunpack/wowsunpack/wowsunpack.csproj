@@ -7,8 +7,8 @@
     <ProjectGuid>{38B12AFF-344A-4EA3-9C9B-30A4374341FD}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>wowsunpack</RootNamespace>
-    <AssemblyName>wowsunpack</AssemblyName>
+    <RootNamespace>HenryQuan</RootNamespace>
+    <AssemblyName>HenryQuan.WoWsUnpack</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>

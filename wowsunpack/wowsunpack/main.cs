@@ -7,9 +7,9 @@ using System.IO.Compression;
 using System.Linq;
 using wowsunpack;
 
-namespace henryquan
+namespace HenryQuan
 {
-    class DummyTable : Hashtable
+    class DataTable : Hashtable
     {
         public void __setstate__(Hashtable arg)
         {
@@ -20,11 +20,11 @@ namespace henryquan
         }
     }
 
-    class DummyConstructor : IObjectConstructor
+    class DataConstructor : IObjectConstructor
     {
         public object construct(object[] args)
         {
-            return new DummyTable();
+            return new DataTable();
         }
     }
 
@@ -36,7 +36,6 @@ namespace henryquan
             // record the time taken
             var start = DateTime.Now;
             Console.WriteLine("Unpacking...");
-            /*const string path = @"C:\Users\nateq\Documents\Programming\Python\WoWS-GameParams\content\GameParams.data";*/
             // the raw data is in big endian, not little endian like Windows
             var rawData = File.ReadAllBytes(path);
             Console.WriteLine("Read GameParams.data");
@@ -51,7 +50,7 @@ namespace henryquan
                 {
                     Console.WriteLine("Decompressed GameParams.data");
                     var pickler = new Unpickler();
-                    Unpickler.registerConstructor("copy_reg", "_reconstructor", new DummyConstructor());
+                    Unpickler.registerConstructor("copy_reg", "_reconstructor", new DataConstructor());
                     object[] unpacked = (object[])pickler.load(decompressed);
                     Console.WriteLine("Decoded GameParams.data");
 
