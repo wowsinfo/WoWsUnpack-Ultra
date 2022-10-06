@@ -2,6 +2,3 @@
 bin/
 obj/
 packages/
-
-# the dll export framework
-DllExport.bat
