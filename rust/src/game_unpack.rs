@@ -2,17 +2,20 @@ use log::{error, info, warn};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
+use std::rc::Rc;
 use std::{array, vec};
 
 ///
 /// GameFileUnpack.hpp
-/// 
+///
 
 type Byte = u8;
 
 const G_IDX_SIGNATURE: [Byte; 4] = [0x49, 0x53, 0x46, 0x50];
+const G_SEP: char = '\\';
 
 const HEADER_SIZE: u32 = 56;
+#[derive(Debug)]
 struct IdxHeader {
     nodes: i32,
     files: i32,
@@ -24,6 +27,7 @@ struct IdxHeader {
 }
 
 const NODE_SIZE: u32 = 32;
+#[derive(Debug, Clone)]
 struct Node {
     name: String,
     id: u64,
@@ -32,6 +36,7 @@ struct Node {
 }
 
 const FILE_RECORD_SIZE: u32 = 48;
+#[derive(Debug, Clone)]
 struct FileRecord {
     pkg_name: String,
     path: String,
@@ -47,28 +52,93 @@ struct IdxFile {
     files: HashMap<String, FileRecord>,
 }
 
-struct DirectoryTree {
-    root: HashMap<String, DirectoryTree>,
-}
-
 struct TreeNode {
     nodes: HashMap<String, TreeNode>,
     file: Option<FileRecord>,
+}
+
+impl TreeNode {
+    fn new() -> TreeNode {
+        TreeNode {
+            nodes: HashMap::new(),
+            file: None,
+        }
+    }
+
+    fn createWith(file: FileRecord) -> TreeNode {
+        TreeNode {
+            nodes: HashMap::new(),
+            file: Some(file),
+        }
+    }
+}
+
+struct DirectoryTree {
+    root: TreeNode,
+}
+
+impl DirectoryTree {
+    fn find(&self, path: &str) -> Option<&TreeNode> {
+        let mut current = &self.root;
+        for part in path.split("/") {
+            if part.is_empty() {
+                continue;
+            }
+
+            if let Some(node) = current.nodes.get(part) {
+                current = node;
+            } else {
+                return None;
+            }
+        }
+        Some(current)
+    }
+
+    fn insert(&mut self, file_record: &FileRecord) {
+        if let Some(_) = file_record.path.rfind('/') {
+            // under a directory
+            self.create_path(file_record);
+        } else {
+            // under root
+            self.root.nodes.insert(
+                file_record.path.clone(),
+                TreeNode::createWith(file_record.clone()),
+            );
+        }
+    }
+
+    /// Add the file record to the directory tree
+    /// Create the path if it doesn't exist
+    fn create_path(&mut self, file_record: &FileRecord) {
+        let mut current = &mut self.root;
+        for part in file_record.path.split("/") {
+            if part.is_empty() {
+                continue;
+            }
+
+            // Insert it if it doesn't exist
+            if !current.nodes.contains_key(part) {
+                let new_node = TreeNode::new();
+                current.nodes.insert(part.to_string(), new_node);
+            }
+            current = current.nodes.get_mut(part).expect("Failed to find the node");
+        }
+
+        current.nodes.insert(
+            file_record.path.clone(),
+            TreeNode::createWith(file_record.clone()),
+        );
+    }
 }
 
 struct Unpacker {
     directory_tree: DirectoryTree,
     pkg_path: String,
 }
-///
-/// GameFileUnpack.cpp
-///
-
-const G_SEP: char = '\\';
 
 ///
 /// Helpers
-/// 
+///
 
 fn write_file_data(file_name: &str, data: &[Byte]) -> bool {
     // write the data
