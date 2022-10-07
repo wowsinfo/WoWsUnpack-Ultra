@@ -1,8 +1,10 @@
-use log::{error, info, warn};
+use flate2::read::ZlibDecoder;
+use log::{error, debug};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::fs::{self, File, OpenOptions};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::path::Path;
 
 ///
 /// GameFileUnpack.hpp
@@ -30,7 +32,7 @@ impl IdxHeader {
     fn parse(data: &[Byte]) -> Option<IdxHeader> {
         let data_size = data.len() as u32;
         if data_size != HEADER_SIZE {
-            error!("Invalid IdxHeader size {}", data_size);
+            log::error!("Invalid IdxHeader size {}", data_size);
             return None;
         }
 
@@ -77,10 +79,11 @@ impl Node {
             );
             return None;
         }
+        debug!("String pointer {}", pointer);
 
         let name = read_null_terminated_string(full_data, pointer as usize)
             .expect("Failed to get node name");
-        info!("Node name: {}", name);
+        debug!("Node name: {}", name);
 
         let id = bincode::deserialize(&data[16..24]).expect("Failed to deserialize node id");
         let parent =
@@ -225,7 +228,7 @@ impl IdxFile {
                 return None;
             }
             let node = node.unwrap();
-            info!("Node: {:?}", node);
+            debug!("Node: {:?}", node);
             nodes.insert(node.id, node);
         }
 
@@ -263,38 +266,11 @@ impl IdxFile {
                 return None;
             }
             let file_record = file_record.unwrap();
-            info!("FileRecord: {:?}", file_record);
+            debug!("FileRecord: {:?}", file_record);
             files.insert(file_record.path.clone(), file_record);
         }
 
         // parse trailer
-        // if (originalData.size() < header.TrailerOffset + 0x10)
-        // {
-        // 	LOG_ERROR("Trailer data ({} bytes) smaller than offset ({})", originalData.size(), header.ThirdOffset + 0x10);
-        // 	return {};
-        // }
-        // std::span trailerData = originalData.subspan(header.TrailerOffset + 0x10);
-
-        // struct
-        // {
-        // 	int64_t unknown1;
-        // 	int64_t unknown2;
-        // 	uint64_t unknown3;
-        // } unknown;
-        // if (!TakeInto(trailerData, unknown))
-        // {
-        // 	LOG_ERROR("Failed to take unknown from trailer data");
-        // 	return {};
-        // }
-
-        // if (!ReadNullTerminatedString(trailerData, 0, file.PkgName))
-        // {
-        // 	LOG_ERROR("Failed to get file pkg name");
-        // 	return {};
-        // }
-
-        // return file;
-
         let trailer_offset = header.trailer_offset as usize + 0x10;
         if data_size < trailer_offset {
             error!(
@@ -313,7 +289,7 @@ impl IdxFile {
         }
 
         let pkg_name = pkg_name.unwrap();
-        info!("PkgName: {}", pkg_name);
+        debug!("PkgName: {}", pkg_name);
 
         return Some(IdxFile {
             pkg_name,
@@ -405,9 +381,172 @@ impl DirectoryTree {
     }
 }
 
-struct Unpacker {
+pub struct Unpacker {
     directory_tree: DirectoryTree,
     pkg_path: String,
+}
+
+impl Unpacker {
+    /**
+     * Create a new Unpacker
+     * @param pkg_path The path to the pkg file
+     * @param idx_file The path to the idx file
+     */
+    pub fn new(pkg_path: &str, idx_path: &str) -> Option<Self> {
+        if !Path::new(idx_path).exists() {
+            error!("IdxPath does not exist: {}", idx_path);
+            return None;
+        }
+
+        let mut unpacker = Unpacker {
+            directory_tree: DirectoryTree {
+                root: TreeNode::new(),
+            },
+            pkg_path: pkg_path.to_string(),
+        };
+
+        for entry in fs::read_dir(idx_path).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_file() && path.extension().unwrap() == "idx" {
+                // read with buffer to speed up
+                let mut file = BufReader::new(File::open(path).unwrap());
+                let mut data = Vec::new();
+                file.read_to_end(&mut data).unwrap();
+
+                let idx_file = IdxFile::parse(&data);
+                if idx_file.is_none() {
+                    error!("Failed to parse idxFile");
+                    return None;
+                }
+
+                let idx_file = idx_file.unwrap();
+                for (path, file_record) in idx_file.files {
+                    unpacker.directory_tree.insert(&FileRecord {
+                        pkg_name: idx_file.pkg_name.clone(),
+                        path,
+                        id: file_record.id,
+                        offset: file_record.offset,
+                        size: file_record.size,
+                        uncompressed_size: file_record.uncompressed_size,
+                    });
+                }
+            }
+        }
+
+        return Some(unpacker);
+    }
+
+    pub fn extract(&self, node_name: &str, dest: &str) -> bool {
+        let node_result = self.directory_tree.find(node_name);
+        if node_result.is_none() {
+            error!(
+                "There exists no node with name {} in directory tree",
+                node_name
+            );
+            return false;
+        }
+        let root_node = node_result.unwrap();
+
+        let mut stack = vec![root_node];
+
+        while !stack.is_empty() {
+            let node = stack.pop().unwrap();
+            for (_, child) in &node.nodes {
+                stack.push(child);
+            }
+
+            if node.file.is_some() {
+                if !self.extract_file(&node.file.as_ref().unwrap(), dest) {
+                    error!(
+                        "Failed to extract file: {}",
+                        node.file.as_ref().unwrap().path
+                    );
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    pub fn exact_folder(&self, folder_name: &str, dest: &str) -> bool {
+        let node_result = self.directory_tree.find(folder_name);
+        if node_result.is_none() {
+            error!(
+                "There exists no node with name {} in directory tree",
+                folder_name
+            );
+            return false;
+        }
+        let root_node = node_result.unwrap();
+
+        let mut stack = vec![root_node];
+
+        while !stack.is_empty() {
+            let node = stack.pop().unwrap();
+            for (_, child) in &node.nodes {
+                stack.push(child);
+            }
+
+            if node.file.is_some() {
+                if !self.extract_file(&node.file.as_ref().unwrap(), dest) {
+                    error!(
+                        "Failed to extract file: {}",
+                        node.file.as_ref().unwrap().path
+                    );
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    fn extract_file(&self, file_record: &FileRecord, dest: &str) -> bool {
+        let pkg_file_path = Path::new(&self.pkg_path).join(&file_record.pkg_name);
+        let pkg_file = File::open(pkg_file_path).unwrap();
+
+        let file_size = pkg_file.metadata().unwrap().len() as usize;
+        let file_record_size = file_record.size as usize;
+        let file_record_offset = file_record.offset as usize;
+        if file_record_offset + file_record_size > file_size {
+            error!(
+                "Got offset ({} - {}) out of size bounds ({})",
+                file_record_offset,
+                file_record_offset + file_record_size,
+                file_size
+            );
+            return false;
+        }
+
+        // remove the filename
+        let out_dir = Path::new(dest).join(&file_record.path);
+        let out_dir = out_dir.parent().unwrap();
+        if !out_dir.exists() {
+            fs::create_dir_all(out_dir).unwrap();
+        }
+
+        let file_path = Path::new(dest).join(&file_record.path);
+        let file_path = file_path.to_str().unwrap();
+        let mut file = File::open(file_path).unwrap();
+        file.seek(SeekFrom::Start(file_record_offset as u64))
+            .unwrap();
+
+        let mut data = vec![0; file_record.size as usize];
+        file.read_exact(&mut data).unwrap();
+
+        let file_uncompressed_size = file_record.uncompressed_size as usize;
+        // check if data is compressed and decompress with zlib
+        if file_record_size != file_uncompressed_size {
+            let mut decoder = ZlibDecoder::new(data.as_slice());
+            let mut inflated = Vec::new();
+            decoder.read_to_end(&mut inflated).unwrap();
+            return write_file_data(file_path, &inflated);
+        }
+
+        return write_file_data(file_path, &data);
+    }
 }
 
 ///
@@ -447,24 +586,26 @@ fn read_null_terminated_string(data: &[Byte], offset: usize) -> Option<String> {
     }
 
     let string_data = &data[offset..(offset + length)];
-    let string = take_string(string_data, length);
-    if string.is_none() {
-        error!("Failed to read string");
-        return None;
-    }
-
-    return string;
+    return match take_string(string_data, length) {
+        Some(s) => Some(s),
+        None => {
+            error!("Failed to read string");
+            None
+        }
+    };
 }
 
 fn take_string(data: &[Byte], size: usize) -> Option<String> {
     if data.len() >= size {
-        let string = String::from_utf8(data[0..size].to_vec());
-        if string.is_err() {
-            error!("Failed to convert string");
-            return None;
+        return match String::from_utf8(data[0..size].to_vec()) {
+            Ok(string) => Some(string),
+            Err(e) => {
+                error!("Failed to deserialize string - {}", e);
+                None
+            }
         }
-        return Some(string.unwrap());
     }
+
     return None;
 }
 
