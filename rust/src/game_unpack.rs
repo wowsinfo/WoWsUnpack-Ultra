@@ -1,5 +1,5 @@
 use flate2::read::ZlibDecoder;
-use log::{error, debug};
+use log::{debug, error, info};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
@@ -66,11 +66,11 @@ impl Node {
             return None;
         }
 
-        let pointer: u64 =
+        let pointer: i64 =
             bincode::deserialize(&data[8..16]).expect("Failed to deserialize string pointer");
 
         let full_data_size = full_data.len() as u64;
-        if pointer >= full_data_size {
+        if pointer >= full_data_size as i64 {
             error!(
                 "String pointer {} outside data range {}",
                 pointer, full_data_size
@@ -87,11 +87,7 @@ impl Node {
         let parent =
             bincode::deserialize(&data[24..32]).expect("Failed to deserialize node parent");
 
-        Some(Node {
-            name,
-            id,
-            parent,
-        })
+        Some(Node { name, id, parent })
     }
 }
 
@@ -172,19 +168,23 @@ impl IdxFile {
         // parser the node
         let node_size = NODE_SIZE as usize;
         let header = header.unwrap();
-        let total_node_size = header.nodes as usize * node_size;
+        let header_nodes = header.nodes as usize;
+        info!(
+            "Parsed IdxHeader with {} nodes and {} files",
+            header_nodes, header.files
+        );
+        let total_node_size = header_nodes * node_size;
         if data_size < total_node_size {
             error!(
                 "Data too small for {} nodes, expected {} but got {}",
-                header.nodes, total_node_size, data_size
+                header_nodes, total_node_size, data_size
             );
         }
 
-        for i in 0..header.nodes {
-            let index = i as usize;
+        for i in 0..header_nodes {
             // get the node data offset
-            let node_data =
-                &data[header_size + index * node_size..header_size + (index + 1) * node_size];
+            let offset = i * node_size;
+            let node_data = &data[offset..offset + node_size];
             let node = Node::parse(node_data, data);
             if node.is_none() {
                 error!("Failed to parse Node");
@@ -372,6 +372,10 @@ impl Unpacker {
             let entry = entry.unwrap();
             let path = entry.path();
             if path.is_file() && path.extension().unwrap() == "idx" {
+                let filename = path.clone();
+                let filename = filename.file_name().unwrap().to_str().unwrap();
+                info!("Parsing idx file: {}", filename);
+
                 // read with buffer to speed up
                 let mut file = BufReader::new(File::open(path).unwrap());
                 let mut data = Vec::new();
@@ -384,6 +388,7 @@ impl Unpacker {
                 }
 
                 let idx_file = idx_file.unwrap();
+                info!("Parsed idx file: {}", filename);
                 for (path, file_record) in idx_file.files {
                     unpacker.directory_tree.insert(&FileRecord {
                         pkg_name: idx_file.pkg_name.clone(),
@@ -566,7 +571,7 @@ fn take_string(data: &[Byte], size: usize) -> Option<String> {
                 error!("Failed to deserialize string - {}", e);
                 None
             }
-        }
+        };
     }
 
     return None;
