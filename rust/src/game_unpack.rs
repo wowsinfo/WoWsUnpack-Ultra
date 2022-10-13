@@ -1,5 +1,5 @@
 use flate2::read::ZlibDecoder;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
@@ -10,16 +10,14 @@ use std::path::Path;
 /// GameFileUnpack.hpp
 ///
 
-type Byte = u8;
-
-const G_IDX_SIGNATURE: [Byte; 4] = [0x49, 0x53, 0x46, 0x50];
+const G_IDX_SIGNATURE: [u8; 4] = [0x49, 0x53, 0x46, 0x50];
 const G_SEP: char = '\\';
 
 const HEADER_SIZE: u32 = 56;
 // The order should be exact for bincode to work
 #[derive(Debug, Deserialize)]
 struct IdxHeader {
-    first_block: [Byte; 12],
+    first_block: [u8; 12],
     nodes: i32,
     files: i32,
     unknown1: i64,
@@ -29,7 +27,7 @@ struct IdxHeader {
 }
 
 impl IdxHeader {
-    fn parse(data: &[Byte]) -> Option<IdxHeader> {
+    fn parse(data: &[u8]) -> Option<IdxHeader> {
         let data_size = data.len() as u32;
         if data_size != HEADER_SIZE {
             log::error!("Invalid IdxHeader size {}", data_size);
@@ -59,28 +57,28 @@ struct Node {
 }
 
 impl Node {
-    fn parse(data: &[Byte], full_data: &[Byte]) -> Option<Node> {
+    fn parse(data: &[u8], full_data: &[u8]) -> Option<Node> {
         let data_size = data.len() as u32;
         if data_size != NODE_SIZE {
             error!("Invalid Node size {}", data_size);
             return None;
         }
 
-        let pointer: i64 =
+        let pointer: u64 =
             bincode::deserialize(&data[8..16]).expect("Failed to deserialize string pointer");
-
+        let pointer = pointer + HEADER_SIZE as u64;
         let full_data_size = full_data.len() as u64;
-        if pointer >= full_data_size as i64 {
+        if pointer >= full_data_size {
             error!(
                 "String pointer {} outside data range {}",
                 pointer, full_data_size
             );
             return None;
         }
-        debug!("String pointer {}", pointer);
+        // print the pointer in its hex form
+        debug!("String pointer 0x{:x}", pointer);
 
-        let name = read_null_terminated_string(full_data, pointer as usize)
-            .expect("Failed to get node name");
+        let name = read_null_terminated_string(full_data, pointer as usize).unwrap_or("".to_string());
         debug!("Node name: {}", name);
 
         let id = bincode::deserialize(&data[16..24]).expect("Failed to deserialize node id");
@@ -103,8 +101,8 @@ struct FileRecord {
 }
 
 impl FileRecord {
-    // std::optional<FileRecord> FileRecord::Parse(std::span<Byte> data, const std::unordered_map<uint64_t, Node>& nodes)
-    fn parse(data: &[Byte], nodes: &HashMap<u64, Node>) -> Option<FileRecord> {
+    // std::optional<FileRecord> FileRecord::Parse(std::span<u8> data, const std::unordered_map<uint64_t, Node>& nodes)
+    fn parse(data: &[u8], nodes: &HashMap<u64, Node>) -> Option<FileRecord> {
         let data_size = data.len() as u32;
         if data_size != FILE_RECORD_SIZE {
             error!("Invalid FileRecord size {}", data_size);
@@ -147,7 +145,7 @@ struct IdxFile {
 }
 
 impl IdxFile {
-    fn parse(data: &[Byte]) -> Option<IdxFile> {
+    fn parse(data: &[u8]) -> Option<IdxFile> {
         let header_size = HEADER_SIZE as usize;
         let data_size = data.len() as usize;
         if data_size < header_size {
@@ -163,9 +161,6 @@ impl IdxFile {
             return None;
         }
 
-        let mut nodes: HashMap<u64, Node> = HashMap::new();
-
-        // parser the node
         let node_size = NODE_SIZE as usize;
         let header = header.unwrap();
         let header_nodes = header.nodes as usize;
@@ -180,15 +175,18 @@ impl IdxFile {
                 header_nodes, total_node_size, data_size
             );
         }
-
+        
+        // parser the node
+        let mut nodes: HashMap<u64, Node> = HashMap::new();
         for i in 0..header_nodes {
-            // get the node data offset
-            let offset = i * node_size;
+            // get the node data offset consider the header size
+            let offset = header_size + i * node_size;
             let node_data = &data[offset..offset + node_size];
             let node = Node::parse(node_data, data);
             if node.is_none() {
-                error!("Failed to parse Node");
-                return None;
+                // first few nodes are empty
+                warn!("This node is invalid");
+                continue;
             }
             let node = node.unwrap();
             debug!("Node: {:?}", node);
@@ -384,7 +382,7 @@ impl Unpacker {
                 let idx_file = IdxFile::parse(&data);
                 if idx_file.is_none() {
                     error!("Failed to parse idxFile");
-                    return None;
+                    continue;
                 }
 
                 let idx_file = idx_file.unwrap();
@@ -521,7 +519,7 @@ impl Unpacker {
 /// Helpers
 ///
 
-fn write_file_data(file_name: &str, data: &[Byte]) -> bool {
+fn write_file_data(file_name: &str, data: &[u8]) -> bool {
     // write the data
     match OpenOptions::new().write(true).create(true).open(file_name) {
         Ok(mut file) => match file.write_all(data) {
@@ -538,9 +536,10 @@ fn write_file_data(file_name: &str, data: &[Byte]) -> bool {
     }
 }
 
-fn read_null_terminated_string(data: &[Byte], offset: usize) -> Option<String> {
+fn read_null_terminated_string(data: &[u8], offset: usize) -> Option<String> {
     let mut length = 0;
     let data_size = data.len();
+    // stop until we find a null character
     for i in offset..data_size {
         if data[i] == 0 {
             length = i - offset;
@@ -563,7 +562,7 @@ fn read_null_terminated_string(data: &[Byte], offset: usize) -> Option<String> {
     };
 }
 
-fn take_string(data: &[Byte], size: usize) -> Option<String> {
+fn take_string(data: &[u8], size: usize) -> Option<String> {
     if data.len() >= size {
         return match String::from_utf8(data[0..size].to_vec()) {
             Ok(string) => Some(string),
@@ -577,10 +576,10 @@ fn take_string(data: &[Byte], size: usize) -> Option<String> {
     return None;
 }
 
-unsafe fn take_into<T>(data: &[Byte], dest: &mut T) -> bool {
+unsafe fn take_into<T>(data: &[u8], dest: &mut T) -> bool {
     let size = std::mem::size_of::<T>();
     if data.len() >= size {
-        std::ptr::copy_nonoverlapping(data.as_ptr(), dest as *mut T as *mut Byte, size);
+        std::ptr::copy_nonoverlapping(data.as_ptr(), dest as *mut T as *mut u8, size);
         return true;
     }
     return false;
