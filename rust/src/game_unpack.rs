@@ -53,7 +53,6 @@ impl IdxHeader {
 const NODE_SIZE: u32 = 32;
 #[derive(Debug)]
 struct Node {
-    unknown: [Byte; 8],
     name: String,
     id: u64,
     parent: u64,
@@ -67,7 +66,6 @@ impl Node {
             return None;
         }
 
-        let unknown: [Byte; 8] = data[0..8].try_into().unwrap();
         let pointer: u64 =
             bincode::deserialize(&data[8..16]).expect("Failed to deserialize string pointer");
 
@@ -90,7 +88,6 @@ impl Node {
             bincode::deserialize(&data[24..32]).expect("Failed to deserialize node parent");
 
         Some(Node {
-            unknown,
             name,
             id,
             parent,
@@ -117,40 +114,6 @@ impl FileRecord {
             error!("Invalid FileRecord size {}", data_size);
             return None;
         }
-        // FileRecord fileRecord;
-
-        // if (!TakeInto(data, fileRecord.Id))
-        //     return {};
-
-        // Take(data, 8);
-
-        // if (!TakeInto(data, fileRecord.Offset))
-        //     return {};
-
-        // Take(data, 8);
-
-        // if (!TakeInto(data, fileRecord.Size))
-        //     return {};
-
-        // Take(data, 4);
-
-        // if (!TakeInto(data, fileRecord.UncompressedSize))
-        //     return {};
-
-        // std::vector<std::string_view> paths;
-        // uint64_t current = fileRecord.Id;
-
-        // while (nodes.contains(current))
-        // {
-        //     const Node& node = nodes.at(current);
-        //     current = node.Parent;
-        //     paths.emplace_back(node.Name);
-        // }
-
-        // std::ranges::reverse(paths);
-        // fileRecord.Path = Core::String::Join(paths, "/");
-
-        // return fileRecord;
 
         let id = bincode::deserialize(&data[0..8]).expect("Failed to deserialize file id");
         let offset =
@@ -312,7 +275,7 @@ impl TreeNode {
         }
     }
 
-    fn createWith(file: FileRecord) -> Self {
+    fn create_with(file: FileRecord) -> Self {
         Self {
             nodes: HashMap::new(),
             file: Some(file),
@@ -349,7 +312,7 @@ impl DirectoryTree {
             // under root
             self.root.nodes.insert(
                 file_record.path.clone(),
-                TreeNode::createWith(file_record.clone()),
+                TreeNode::create_with(file_record.clone()),
             );
         }
     }
@@ -376,7 +339,7 @@ impl DirectoryTree {
 
         current.nodes.insert(
             file_record.path.clone(),
-            TreeNode::createWith(file_record.clone()),
+            TreeNode::create_with(file_record.clone()),
         );
     }
 }
@@ -574,7 +537,7 @@ fn read_null_terminated_string(data: &[Byte], offset: usize) -> Option<String> {
     let mut length = 0;
     let data_size = data.len();
     for i in offset..data_size {
-        if data[i as usize] == 0 {
+        if data[i] == 0 {
             length = i - offset;
             break;
         }
