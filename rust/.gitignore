@@ -1,1 +1,4 @@
+# rust build folder
 target/
+# test folder
+output/

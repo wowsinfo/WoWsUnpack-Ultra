@@ -86,7 +86,8 @@ impl Node {
         // print the pointer in its hex form
         debug!("String pointer 0x{:x}", pointer);
 
-        let name = read_null_terminated_string(full_data, pointer as usize).unwrap_or("".to_string());
+        let name =
+            read_null_terminated_string(full_data, pointer as usize).unwrap_or("".to_string());
         debug!("Node name: {}", name);
 
         let id = bincode::deserialize(&data[16..24]).expect("Failed to deserialize node id");
@@ -200,19 +201,19 @@ impl IdxFile {
             debug!("Node: {:?}", node);
             nodes.insert(node.id, node);
         }
+        assert_eq!(nodes.len(), header_nodes);
 
         // parse file records
         let third_offset = header.third_offset as usize + 0x10;
         if data_size < third_offset {
             error!(
                 "File record data ({}) smaller than offset ({})",
-                data_size,
-                header.third_offset + 0x10
+                data_size, third_offset
             );
             return None;
         }
 
-        let file_record_data = &data[third_offset..data_size];
+        let file_record_data = &data[third_offset..];
         let file_record_size = FILE_RECORD_SIZE as usize;
         let header_files = header.files as usize;
         let total_file_record_size = header_files * file_record_size;
@@ -226,9 +227,8 @@ impl IdxFile {
 
         let mut files: HashMap<String, FileRecord> = HashMap::new();
         for i in 0..header_files {
-            let index = i as usize;
-            let file_record_data =
-                &file_record_data[index * file_record_size..(index + 1) * file_record_size];
+            let index = i * file_record_size;
+            let file_record_data = &file_record_data[index..index + file_record_size];
             let file_record = FileRecord::parse(file_record_data, &nodes);
             if file_record.is_none() {
                 error!("Failed to parse RawFileRecord");
@@ -238,6 +238,7 @@ impl IdxFile {
             debug!("FileRecord: {:?}", file_record);
             files.insert(file_record.path.clone(), file_record);
         }
+        assert_eq!(files.len(), header_files);
 
         // parse trailer
         let trailer_offset = header.trailer_offset as usize + 0x10;
@@ -249,9 +250,10 @@ impl IdxFile {
             return None;
         }
 
-        let trailer_data = &data[trailer_offset..data_size];
-        let offset = 8 + 8 + 8;
-        let pkg_name = read_null_terminated_string(trailer_data, offset);
+        let trailer_data = &data[trailer_offset..];
+        // the name starts from byte 24
+        let trailer_data = &trailer_data[24..];
+        let pkg_name = read_null_terminated_string(trailer_data, 0);
         if pkg_name.is_none() {
             error!("Failed to get file pkg name");
             return None;
@@ -414,16 +416,16 @@ impl Unpacker {
     pub fn extract(&self, node_name: &str, dest: &str) -> bool {
         let node_result = self.directory_tree.find(node_name);
         if node_result.is_none() {
-            error!(
+            warn!(
                 "There exists no node with name {} in directory tree",
                 node_name
             );
             return false;
         }
+
+        // extract the node
         let root_node = node_result.unwrap();
-
         let mut stack = vec![root_node];
-
         while !stack.is_empty() {
             let node = stack.pop().unwrap();
             for (_, child) in &node.nodes {
@@ -500,6 +502,7 @@ impl Unpacker {
         if !out_dir.exists() {
             fs::create_dir_all(out_dir).unwrap();
         }
+        info!("Extracting file: {}", file_record.path);
 
         let file_path = Path::new(dest).join(&file_record.path);
         let file_path = file_path.to_str().unwrap();

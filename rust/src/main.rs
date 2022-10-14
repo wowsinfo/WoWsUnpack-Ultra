@@ -6,7 +6,7 @@ use game_unpack::Unpacker;
 fn main() {
     // allow all logs only in debug mode
     if cfg!(debug_assertions) {
-        env_logger::Builder::from_env(Env::default().default_filter_or("trace")).init();
+        env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     } else {
         env_logger::Builder::from_env(Env::default().default_filter_or("off")).init();
     }
