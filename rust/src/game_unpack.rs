@@ -1,8 +1,7 @@
-use flate2::read::ZlibDecoder;
 use log::{debug, error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::{self, File, OpenOptions};
+use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
@@ -184,7 +183,7 @@ impl IdxFile {
                 header_nodes, total_node_size, data_size
             );
         }
-        
+
         // parser the node
         let mut nodes: HashMap<u64, Node> = HashMap::new();
         for i in 0..header_nodes {
@@ -376,7 +375,7 @@ impl Unpacker {
             pkg_path: pkg_path.to_string(),
         };
 
-        for entry in fs::read_dir(idx_path).unwrap() {
+        for entry in std::fs::read_dir(idx_path).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
             if path.is_file() && path.extension().unwrap() == "idx" {
@@ -479,19 +478,25 @@ impl Unpacker {
         return true;
     }
 
+    /**
+     * Extract a file_record from the pkg file
+     * @param file_record The file record
+     * @param dest The destination path
+     * @return true if success
+     */
     fn extract_file(&self, file_record: &FileRecord, dest: &str) -> bool {
+        info!("Extracting record: {:?}", file_record);
         let pkg_file_path = Path::new(&self.pkg_path).join(&file_record.pkg_name);
         let pkg_file = File::open(pkg_file_path).unwrap();
 
-        let file_size = pkg_file.metadata().unwrap().len() as usize;
-        let file_record_size = file_record.size as usize;
-        let file_record_offset = file_record.offset as usize;
-        if file_record_offset + file_record_size > file_size {
+        let pkg_file_size = pkg_file.metadata().unwrap().len() as usize;
+        let file_size = file_record.size as usize;
+        let file_offset = file_record.offset as usize;
+        let file_end_offset = file_offset + file_size;
+        if file_end_offset > pkg_file_size {
             error!(
                 "Got offset ({} - {}) out of size bounds ({})",
-                file_record_offset,
-                file_record_offset + file_record_size,
-                file_size
+                file_offset, file_end_offset, pkg_file_size
             );
             return false;
         }
@@ -500,29 +505,33 @@ impl Unpacker {
         let out_dir = Path::new(dest).join(&file_record.path);
         let out_dir = out_dir.parent().unwrap();
         if !out_dir.exists() {
-            fs::create_dir_all(out_dir).unwrap();
+            std::fs::create_dir_all(out_dir).unwrap();
+            println!("Created directory: {}", out_dir.display());
         }
         info!("Extracting file: {}", file_record.path);
 
+        // go to the file offset
+        let mut pkg_reader = BufReader::new(&pkg_file);
+        pkg_reader.seek(SeekFrom::Start(file_offset as u64)).unwrap();
+        let mut raw_data = vec![0; file_size];
+        pkg_reader.read_exact(&mut raw_data).unwrap();
+
+        // get the output path ready
         let file_path = Path::new(dest).join(&file_record.path);
         let file_path = file_path.to_str().unwrap();
-        let mut file = File::open(file_path).unwrap();
-        file.seek(SeekFrom::Start(file_record_offset as u64))
-            .unwrap();
-
-        let mut data = vec![0; file_record.size as usize];
-        file.read_exact(&mut data).unwrap();
-
         let file_uncompressed_size = file_record.uncompressed_size as usize;
-        // check if data is compressed and decompress with zlib
-        if file_record_size != file_uncompressed_size {
-            let mut decoder = ZlibDecoder::new(data.as_slice());
-            let mut inflated = Vec::new();
-            decoder.read_to_end(&mut inflated).unwrap();
-            return write_file_data(file_path, &inflated);
+        // decompress if necessary with zlib
+        if file_size != file_uncompressed_size {
+            println!("Decompressing...");
+            // revsere it to little endian and make sure the data starts with 78 DA (Zlib best compression)
+            raw_data.reverse();
+            assert!(raw_data[0] == 0x78 && raw_data[1] == 0xDA);
+            let decompressed = deflate::deflate_bytes_zlib(raw_data.as_slice());
+            // assert_eq!(decompressed.len(), file_uncompressed_size);
+            return write_file_data(file_path, &decompressed);
         }
 
-        return write_file_data(file_path, &data);
+        return write_file_data(file_path, &raw_data);
     }
 }
 
@@ -585,13 +594,4 @@ fn take_string(data: &[u8], size: usize) -> Option<String> {
     }
 
     return None;
-}
-
-unsafe fn take_into<T>(data: &[u8], dest: &mut T) -> bool {
-    let size = std::mem::size_of::<T>();
-    if data.len() >= size {
-        std::ptr::copy_nonoverlapping(data.as_ptr(), dest as *mut T as *mut u8, size);
-        return true;
-    }
-    return false;
 }
