@@ -4,23 +4,20 @@ use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use flate2::read::{ZlibDecoder,DeflateDecoder};
 
-///
-/// GameFileUnpack.hpp
-///
-
+// the index file header
 const G_IDX_SIGNATURE: [u8; 4] = [0x49, 0x53, 0x46, 0x50];
-const G_SEP: char = '\\';
 
 const HEADER_SIZE: u32 = 56;
 // The order should be exact for bincode to work
 #[derive(Debug, Deserialize)]
 struct IdxHeader {
-    first_block: [u8; 12],
+    _first_block: [u8; 12],
     nodes: i32,
     files: i32,
-    unknown1: i64,
-    unknown2: i64,
+    _unknown1: i64,
+    _unknown2: i64,
     third_offset: i64,
     trailer_offset: i64,
 }
@@ -148,7 +145,7 @@ impl FileRecord {
 
 struct IdxFile {
     pkg_name: String,
-    nodes: HashMap<u64, Node>,
+    // nodes: HashMap<u64, Node>,
     files: HashMap<String, FileRecord>,
 }
 
@@ -263,7 +260,7 @@ impl IdxFile {
 
         return Some(IdxFile {
             pkg_name,
-            nodes,
+            // nodes,
             files,
         });
     }
@@ -520,15 +517,30 @@ impl Unpacker {
         let file_path = Path::new(dest).join(&file_record.path);
         let file_path = file_path.to_str().unwrap();
         let file_uncompressed_size = file_record.uncompressed_size as usize;
+        println!("Unpacking file: {} ({}/{})", file_path, file_size, file_uncompressed_size);
         // decompress if necessary with zlib
         if file_size != file_uncompressed_size {
-            println!("Decompressing...");
-            // revsere it to little endian and make sure the data starts with 78 DA (Zlib best compression)
-            raw_data.reverse();
-            assert!(raw_data[0] == 0x78 && raw_data[1] == 0xDA);
-            let decompressed = deflate::deflate_bytes_zlib(raw_data.as_slice());
-            // assert_eq!(decompressed.len(), file_uncompressed_size);
-            return write_file_data(file_path, &decompressed);
+            // check if this is zlib format
+            let mut decompressed_data = vec![0; file_uncompressed_size];
+            if raw_data.last() == Some(&0x78) {
+                // zlib, convert to little endian
+                raw_data.reverse();
+                let mut decompressor = ZlibDecoder::new(raw_data.as_slice());
+                decompressor.read(&mut decompressed_data).unwrap();
+            } else {
+                // deflate it like normal
+                let mut decompressor = DeflateDecoder::new(raw_data.as_slice());
+                decompressor.read(&mut decompressed_data).unwrap();
+            }
+
+            if decompressed_data.len() != file_uncompressed_size {
+                panic!(
+                    "Decompressed size ({}) does not match expected size ({})",
+                    decompressed_data.len(),
+                    file_uncompressed_size
+                );
+            }
+            return write_file_data(file_path, &decompressed_data);
         }
 
         return write_file_data(file_path, &raw_data);
