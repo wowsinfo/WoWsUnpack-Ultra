@@ -57,7 +57,14 @@ struct Node {
 }
 
 impl Node {
-    fn parse(data: &[u8], full_data: &[u8]) -> Option<Node> {
+    /**
+     * @brief Parse a node with its offset and get the name from full_data
+     * @param data The data to parse
+     * @param offset The offset of the node
+     * @param full_data The full data of the file
+     * @return The parsed node
+     */
+    fn parse(data: &[u8], offset: usize, full_data: &[u8]) -> Option<Node> {
         let data_size = data.len() as u32;
         if data_size != NODE_SIZE {
             error!("Invalid Node size {}", data_size);
@@ -66,7 +73,8 @@ impl Node {
 
         let pointer: u64 =
             bincode::deserialize(&data[8..16]).expect("Failed to deserialize string pointer");
-        let pointer = pointer + HEADER_SIZE as u64;
+        // the offset here is very important because the raw point address is incorrect
+        let pointer = pointer + offset as u64;
         let full_data_size = full_data.len() as u64;
         if pointer >= full_data_size {
             error!(
@@ -182,7 +190,7 @@ impl IdxFile {
             // get the node data offset consider the header size
             let offset = header_size + i * node_size;
             let node_data = &data[offset..offset + node_size];
-            let node = Node::parse(node_data, data);
+            let node = Node::parse(node_data, offset, data);
             if node.is_none() {
                 // first few nodes are empty
                 warn!("This node is invalid");
