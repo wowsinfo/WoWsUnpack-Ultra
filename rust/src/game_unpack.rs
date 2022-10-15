@@ -1,10 +1,10 @@
+use flate2::bufread::{DeflateDecoder, ZlibDecoder};
 use log::{debug, error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
-use flate2::read::{ZlibDecoder,DeflateDecoder};
 
 // the index file header
 const G_IDX_SIGNATURE: [u8; 4] = [0x49, 0x53, 0x46, 0x50];
@@ -509,7 +509,9 @@ impl Unpacker {
 
         // go to the file offset
         let mut pkg_reader = BufReader::new(&pkg_file);
-        pkg_reader.seek(SeekFrom::Start(file_offset as u64)).unwrap();
+        pkg_reader
+            .seek(SeekFrom::Start(file_offset as u64))
+            .unwrap();
         let mut raw_data = vec![0; file_size];
         pkg_reader.read_exact(&mut raw_data).unwrap();
 
@@ -517,18 +519,25 @@ impl Unpacker {
         let file_path = Path::new(dest).join(&file_record.path);
         let file_path = file_path.to_str().unwrap();
         let file_uncompressed_size = file_record.uncompressed_size as usize;
-        println!("Unpacking file: {} ({}/{})", file_path, file_size, file_uncompressed_size);
+        println!(
+            "Unpacking file: {} ({}/{})",
+            file_path, file_size, file_uncompressed_size
+        );
         // decompress if necessary with zlib
         if file_size != file_uncompressed_size {
-            // check if this is zlib format
             let mut decompressed_data = vec![0; file_uncompressed_size];
-            if raw_data.last() == Some(&0x78) {
+            let byte_l1 = raw_data[file_size - 1];
+            let byte_l2 = raw_data[file_size - 2];
+            // check Zlib magic header
+            if byte_l1 == 0x78 && (byte_l2 == 0x1 || byte_l2 == 0x9C || byte_l2 == 0xDA) {
                 // zlib, convert to little endian
+                info!("Deflate Zlib");
                 raw_data.reverse();
                 let mut decompressor = ZlibDecoder::new(raw_data.as_slice());
                 decompressor.read(&mut decompressed_data).unwrap();
             } else {
                 // deflate it like normal
+                info!("Deflate");
                 let mut decompressor = DeflateDecoder::new(raw_data.as_slice());
                 decompressor.read(&mut decompressed_data).unwrap();
             }

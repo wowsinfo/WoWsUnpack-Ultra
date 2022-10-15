@@ -11,6 +11,6 @@ fn main() {
         env_logger::Builder::from_env(Env::default().default_filter_or("off")).init();
     }
     
-    let unpacker = Unpacker::new(r"C:\Games\World_of_Warships\res_packages", r"C:\Games\World_of_Warships\bin\5771708\idx").unwrap();
+    let unpacker = Unpacker::new(r"C:\Games\World_of_Warships\res_packages", r"C:\Games\World_of_Warships\bin\6359964\idx").unwrap();
     unpacker.extract("content/GameParams.data", "output");
 }
