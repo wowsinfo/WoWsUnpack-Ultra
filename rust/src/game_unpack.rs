@@ -442,7 +442,8 @@ impl Unpacker {
         return true;
     }
 
-    pub fn exact_folder(&self, folder_name: &str, dest: &str) -> bool {
+    // Is this the same as extract method??
+    pub fn extract_folder(&self, folder_name: &str, dest: &str) -> bool {
         let node_result = self.directory_tree.find(folder_name);
         if node_result.is_none() {
             error!(
@@ -530,11 +531,23 @@ impl Unpacker {
             let byte_l2 = raw_data[file_size - 2];
             // check Zlib magic header
             if byte_l1 == 0x78 && (byte_l2 == 0x1 || byte_l2 == 0x9C || byte_l2 == 0xDA) {
-                // zlib, convert to little endian
-                info!("Deflate Zlib");
-                raw_data.reverse();
-                let mut decompressor = ZlibDecoder::new(raw_data.as_slice());
-                decompressor.read(&mut decompressed_data).unwrap();
+                info!("Deflate");
+                // this can be a zlib compressed file, but we should always try to decompress it first
+                let mut decompressor = DeflateDecoder::new(&raw_data[..]);
+                match decompressor.read(&mut decompressed_data) {
+                    // decompression was successful
+                    Ok(_) => {}
+                    Err(_) => {
+                        warn!("Deflate failed, trying Zlib");
+                        // try to reverse the bytes and decompress it with zlib
+                        raw_data.reverse();
+                        let mut zlib_decompressor = ZlibDecoder::new(raw_data.as_slice());
+                        // if this fails, we can't really do anything, please log a ticket on GitHub
+                        zlib_decompressor.read(&mut decompressed_data).unwrap();
+                    }
+                }
+                // raw_data.reverse();
+                // ignore the magic header
             } else {
                 // deflate it like normal
                 info!("Deflate");

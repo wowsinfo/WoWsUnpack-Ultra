@@ -12,5 +12,7 @@ fn main() {
     }
     
     let unpacker = Unpacker::new(r"C:\Games\World_of_Warships\res_packages", r"C:\Games\World_of_Warships\bin\6359964\idx").unwrap();
+    // only two files under this folder
+    unpacker.extract_folder("gui/4k/", "output");
     unpacker.extract("content/GameParams.data", "output");
 }
