@@ -1,10 +1,13 @@
-use flate2::bufread::{DeflateDecoder, ZlibDecoder};
+use flate2::bufread::DeflateDecoder;
 use log::{debug, error, info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fs::{File, OpenOptions};
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+
+pub type UnpackError = Box<dyn Error>;
 
 // the index file header
 const G_IDX_SIGNATURE: [u8; 4] = [0x49, 0x53, 0x46, 0x50];
@@ -354,15 +357,65 @@ pub struct Unpacker {
 }
 
 impl Unpacker {
+    pub fn new_auto(game_path: &str) -> Result<Self, UnpackError> {
+        let pkg_path = Path::new(game_path).join("res_packages");
+        if !pkg_path.exists() {
+            return Err(Box::from("Failed to find res_packages directory"));
+        }
+
+        // need to find the latest index folder
+        let bin_path = Path::new(game_path).join("bin");
+        if !bin_path.exists() {
+            return Err(Box::from("Failed to find bin directory"));
+        }
+
+        // filter out folders in bin_path
+        let mut latest_folder = 0;
+        for entry in std::fs::read_dir(bin_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                let folder_name = path
+                    .file_name()
+                    .ok_or("Failed to get folder name")?
+                    .to_str()
+                    .ok_or("Failed to get folder name")?;
+                if let Ok(folder_num) = folder_name.parse::<u32>() {
+                    if folder_num > latest_folder {
+                        latest_folder = folder_num;
+                    }
+                }
+            }
+        }
+
+        let latest_folder = latest_folder.to_string();
+        // game_path/bin/latest_folder
+        let idx_path = Path::new(game_path)
+            .join("bin")
+            .join(latest_folder)
+            .join("idx");
+        let idx_path = idx_path.to_str().ok_or("Failed to get idx path")?;
+        let pkg_path = pkg_path.to_str().ok_or("Failed to get pkg path")?;
+
+        info!("Idx path: {}", idx_path);
+        info!("Pkg path: {}", pkg_path);
+
+        return Self::new(pkg_path, idx_path);
+    }
+
     /**
      * Create a new Unpacker
      * @param pkg_path The path to the pkg file
      * @param idx_file The path to the idx file
      */
-    pub fn new(pkg_path: &str, idx_path: &str) -> Option<Self> {
+    pub fn new(pkg_path: &str, idx_path: &str) -> Result<Self, UnpackError> {
         if !Path::new(idx_path).exists() {
-            error!("IdxPath does not exist: {}", idx_path);
-            return None;
+            return Err(Box::from("IdxPath does not exist"));
+        }
+
+        // pkg_path needs to have res_package in the string
+        if !pkg_path.contains("res_packages") {
+            return Err(Box::from("PkgPath does not contain res_package"));
         }
 
         let mut unpacker = Unpacker {
@@ -372,26 +425,24 @@ impl Unpacker {
             pkg_path: pkg_path.to_string(),
         };
 
-        for entry in std::fs::read_dir(idx_path).unwrap() {
-            let entry = entry.unwrap();
+        for entry in std::fs::read_dir(idx_path)? {
+            let entry = entry?;
             let path = entry.path();
             if path.is_file() && path.extension().unwrap() == "idx" {
                 let filename = path.clone();
-                let filename = filename.file_name().unwrap().to_str().unwrap();
+                let filename = filename
+                    .file_name()
+                    .ok_or("Failed to get filename")?
+                    .to_str()
+                    .ok_or("Failed to convert filename to str")?;
                 info!("Parsing idx file: {}", filename);
 
                 // read with buffer to speed up
-                let mut file = BufReader::new(File::open(path).unwrap());
+                let mut file = BufReader::new(File::open(path)?);
                 let mut data = Vec::new();
-                file.read_to_end(&mut data).unwrap();
+                file.read_to_end(&mut data)?;
 
-                let idx_file = IdxFile::parse(&data);
-                if idx_file.is_none() {
-                    error!("Failed to parse idxFile");
-                    continue;
-                }
-
-                let idx_file = idx_file.unwrap();
+                let idx_file = IdxFile::parse(&data).ok_or("Failed to parse idx file")?;
                 info!("Parsed idx file: {}", filename);
                 for (path, file_record) in idx_file.files {
                     unpacker.directory_tree.insert(&FileRecord {
@@ -406,74 +457,38 @@ impl Unpacker {
             }
         }
 
-        return Some(unpacker);
+        Ok(unpacker)
     }
 
-    pub fn extract(&self, node_name: &str, dest: &str) -> bool {
+    pub fn extract(&self, node_name: &str, dest: &str) -> Result<(), UnpackError> {
         let node_result = self.directory_tree.find(node_name);
         if node_result.is_none() {
             warn!(
                 "There exists no node with name {} in directory tree",
                 node_name
             );
-            return false;
+            return Ok(());
         }
 
         // extract the node
-        let root_node = node_result.unwrap();
+        let root_node = node_result.ok_or("Failed to find node")?;
         let mut stack = vec![root_node];
         while !stack.is_empty() {
-            let node = stack.pop().unwrap();
+            let node = stack.pop().ok_or("Failed to pop node from stack")?;
             for (_, child) in &node.nodes {
                 stack.push(child);
             }
 
-            if node.file.is_some() {
-                if !self.extract_file(&node.file.as_ref().unwrap(), dest) {
-                    error!(
-                        "Failed to extract file: {}",
-                        node.file.as_ref().unwrap().path
-                    );
-                    return false;
-                }
+            // make sure the record is valid
+            if node.file.is_none() {
+                continue;
             }
+            
+            let file = node.file.as_ref().ok_or("Failed to get file record ref")?;
+            self.extract_file(file, dest)?;
         }
 
-        return true;
-    }
-
-    // Is this the same as extract method??
-    pub fn extract_folder(&self, folder_name: &str, dest: &str) -> bool {
-        let node_result = self.directory_tree.find(folder_name);
-        if node_result.is_none() {
-            error!(
-                "There exists no node with name {} in directory tree",
-                folder_name
-            );
-            return false;
-        }
-        let root_node = node_result.unwrap();
-
-        let mut stack = vec![root_node];
-
-        while !stack.is_empty() {
-            let node = stack.pop().unwrap();
-            for (_, child) in &node.nodes {
-                stack.push(child);
-            }
-
-            if node.file.is_some() {
-                if !self.extract_file(&node.file.as_ref().unwrap(), dest) {
-                    error!(
-                        "Failed to extract file: {}",
-                        node.file.as_ref().unwrap().path
-                    );
-                    return false;
-                }
-            }
-        }
-
-        return true;
+        Ok(())
     }
 
     /**
@@ -482,43 +497,41 @@ impl Unpacker {
      * @param dest The destination path
      * @return true if success
      */
-    fn extract_file(&self, file_record: &FileRecord, dest: &str) -> bool {
+    fn extract_file(&self, file_record: &FileRecord, dest: &str) -> Result<(), UnpackError> {
         info!("Extracting record: {:?}", file_record);
         let pkg_file_path = Path::new(&self.pkg_path).join(&file_record.pkg_name);
-        let pkg_file = File::open(pkg_file_path).unwrap();
+        info!("Pkg file path: {}", pkg_file_path.display());
+        let pkg_file = File::open(pkg_file_path)?;
 
-        let pkg_file_size = pkg_file.metadata().unwrap().len() as usize;
+        let pkg_file_size = pkg_file.metadata()?.len() as usize;
         let file_size = file_record.size as usize;
         let file_offset = file_record.offset as usize;
         let file_end_offset = file_offset + file_size;
         if file_end_offset > pkg_file_size {
-            error!(
+            return Err(Box::from(format!(
                 "Got offset ({} - {}) out of size bounds ({})",
                 file_offset, file_end_offset, pkg_file_size
-            );
-            return false;
+            )));
         }
 
         // remove the filename
         let out_dir = Path::new(dest).join(&file_record.path);
-        let out_dir = out_dir.parent().unwrap();
+        let out_dir = out_dir.parent().ok_or("Failed to get parent dir")?;
         if !out_dir.exists() {
-            std::fs::create_dir_all(out_dir).unwrap();
+            std::fs::create_dir_all(out_dir)?;
             println!("Created directory: {}", out_dir.display());
         }
         info!("Extracting file: {}", file_record.path);
 
         // go to the file offset
         let mut pkg_reader = BufReader::new(&pkg_file);
-        pkg_reader
-            .seek(SeekFrom::Start(file_offset as u64))
-            .unwrap();
+        pkg_reader.seek(SeekFrom::Start(file_offset as u64))?;
         let mut raw_data = vec![0; file_size];
-        pkg_reader.read_exact(&mut raw_data).unwrap();
+        pkg_reader.read_exact(&mut raw_data)?;
 
         // get the output path ready
         let file_path = Path::new(dest).join(&file_record.path);
-        let file_path = file_path.to_str().unwrap();
+        let file_path = file_path.to_str().ok_or("Failed to convert path to str")?;
         let file_uncompressed_size = file_record.uncompressed_size as usize;
         println!(
             "Unpacking file: {} ({}/{})",
@@ -527,33 +540,8 @@ impl Unpacker {
         // decompress if necessary with zlib
         if file_size != file_uncompressed_size {
             let mut decompressed_data = vec![0; file_uncompressed_size];
-            let byte_l1 = raw_data[file_size - 1];
-            let byte_l2 = raw_data[file_size - 2];
-            // check Zlib magic header
-            if byte_l1 == 0x78 && (byte_l2 == 0x1 || byte_l2 == 0x9C || byte_l2 == 0xDA) {
-                info!("Deflate");
-                // this can be a zlib compressed file, but we should always try to decompress it first
-                let mut decompressor = DeflateDecoder::new(&raw_data[..]);
-                match decompressor.read(&mut decompressed_data) {
-                    // decompression was successful
-                    Ok(_) => {}
-                    Err(_) => {
-                        warn!("Deflate failed, trying Zlib");
-                        // try to reverse the bytes and decompress it with zlib
-                        raw_data.reverse();
-                        let mut zlib_decompressor = ZlibDecoder::new(raw_data.as_slice());
-                        // if this fails, we can't really do anything, please log a ticket on GitHub
-                        zlib_decompressor.read(&mut decompressed_data).unwrap();
-                    }
-                }
-                // raw_data.reverse();
-                // ignore the magic header
-            } else {
-                // deflate it like normal
-                info!("Deflate");
-                let mut decompressor = DeflateDecoder::new(raw_data.as_slice());
-                decompressor.read(&mut decompressed_data).unwrap();
-            }
+            let mut decompressor = DeflateDecoder::new(raw_data.as_slice());
+            decompressor.read(&mut decompressed_data).unwrap();
 
             if decompressed_data.len() != file_uncompressed_size {
                 panic!(
@@ -573,21 +561,14 @@ impl Unpacker {
 /// Helpers
 ///
 
-fn write_file_data(file_name: &str, data: &[u8]) -> bool {
+fn write_file_data(file_name: &str, data: &[u8]) -> Result<(), UnpackError> {
     // write the data
-    match OpenOptions::new().write(true).create(true).open(file_name) {
-        Ok(mut file) => match file.write_all(data) {
-            Ok(_) => true,
-            Err(e) => {
-                error!("Failed to write data to outfile {} - {}", file_name, e);
-                false
-            }
-        },
-        Err(e) => {
-            error!("Failed to open file for writing {} - {}", file_name, e);
-            false
-        }
-    }
+    OpenOptions::new()
+        .write(true)
+        .create(true)
+        .open(file_name)?
+        .write_all(data)?;
+    Ok(())
 }
 
 fn read_null_terminated_string(data: &[u8], offset: usize) -> Option<String> {

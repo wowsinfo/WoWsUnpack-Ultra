@@ -4,15 +4,56 @@ mod game_unpack;
 use game_unpack::Unpacker;
 
 fn main() {
-    // allow all logs only in debug mode
     if cfg!(debug_assertions) {
         env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     } else {
         env_logger::Builder::from_env(Env::default().default_filter_or("off")).init();
     }
-    
-    let unpacker = Unpacker::new(r"C:\Games\World_of_Warships\res_packages", r"C:\Games\World_of_Warships\bin\6359964\idx").unwrap();
-    // only two files under this folder
-    unpacker.extract_folder("gui/4k/", "output");
-    unpacker.extract("content/GameParams.data", "output");
+
+    match Unpacker::new_auto(r"C:\Games\World_of_Warships") {
+        Ok(unpacker) => {
+            // only two files under this folder
+            unpacker.extract("gui/dogTags/medium/", "output").unwrap();
+            unpacker.extract("gui/4k/", "output").unwrap();
+            unpacker.extract("content/GameParams.data", "output").unwrap();
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::game_unpack::Unpacker;
+
+    #[test]
+    fn dummy() {
+        assert_eq!(1, 1);
+    }
+
+    #[test]
+    fn test_unpacker_new() {
+        let unpacker = Unpacker::new(
+            r"C:\Games\World_of_Warships\res_packages",
+            r"C:\Games\World_of_Warships\bin\5771708\idx",
+        );
+        assert!(unpacker.is_ok());
+        let unpacker = unpacker.unwrap();
+        let result = unpacker.extract("gui/4k/", "output");
+        assert!(result.is_ok());
+        let result = unpacker.extract("content/GameParams.data", "output");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_unpacker_new_auto() {
+        let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships_PT");
+        assert!(unpacker.is_ok());
+        let unpacker = unpacker.unwrap();
+        let result = unpacker.extract("gui/4k/", "output");
+        assert!(result.is_ok());
+        let result = unpacker.extract("content/GameParams.data", "output");
+        assert!(result.is_ok());
+    }
 }
