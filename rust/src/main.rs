@@ -10,17 +10,12 @@ fn main() {
         env_logger::Builder::from_env(Env::default().default_filter_or("off")).init();
     }
 
-    match Unpacker::new_auto(r"C:\Games\World_of_Warships") {
-        Ok(unpacker) => {
-            // only two files under this folder
-            unpacker.extract("gui/dogTags/medium/", "output").unwrap();
-            unpacker.extract("gui/4k/", "output").unwrap();
-            unpacker.extract("content/GameParams.data", "output").unwrap();
-        }
-        Err(e) => {
-            eprintln!("Error: {}", e);
-        }
-    }
+    let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+    unpacker.extract("gui/dogTags/medium/", "output").unwrap();
+    unpacker.extract("gui/4k/", "output").unwrap();
+    unpacker
+        .extract("content/GameParams.data", "output")
+        .unwrap();
 }
 
 #[cfg(test)]
@@ -43,6 +38,8 @@ mod tests {
         let result = unpacker.extract("gui/4k/", "output");
         assert!(result.is_ok());
         let result = unpacker.extract("content/GameParams.data", "output");
+        assert!(result.is_ok());
+        let result = unpacker.extract("gui/dogTags", "output");
         assert!(result.is_ok());
     }
 
