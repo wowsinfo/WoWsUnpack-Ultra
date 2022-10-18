@@ -11,6 +11,7 @@ env_logger = "0.9.1"
 bincode = "1.3.3"
 serde = { version = "1.0.145", features = ["derive"] }
 flate2 = "1.0.24"
+winreg = "0.10.1"
 
 [release.profile]
 panic = "abort"

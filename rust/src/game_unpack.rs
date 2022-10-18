@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 pub type UnpackError = Box<dyn Error>;
@@ -483,7 +483,7 @@ impl Unpacker {
             if node.file.is_none() {
                 continue;
             }
-            
+
             let file = node.file.as_ref().ok_or("Failed to get file record ref")?;
             self.extract_file(file, dest)?;
         }
