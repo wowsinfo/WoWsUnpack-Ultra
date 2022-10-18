@@ -42,7 +42,7 @@ impl GameDirectory {
         }
     }
 
-    pub unsafe fn locate(&mut self) {
+    pub fn locate(&mut self) {
         for server in GameServer::values() {
             let current_user = RegKey::predef(HKEY_CURRENT_USER);
             let wows = current_user.open_subkey(server.get_registry_key());
