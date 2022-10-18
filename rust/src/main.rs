@@ -16,9 +16,7 @@ fn main() {
     }
 
     let mut game_dir = GameDirectory::new();
-    unsafe {
-        game_dir.locate();
-    }
+    game_dir.locate();
     game_dir.info();
     let ww_dir = game_dir.get_game_directory(GameServer::WW);
     if ww_dir.is_none() {
@@ -71,9 +69,7 @@ mod tests {
     #[test]
     fn find_game_directory() {
         let mut game_dir = GameDirectory::new();
-        unsafe {
-            game_dir.locate();
-        }
+        game_dir.locate();
         let ww_dir = game_dir.get_game_directory(GameServer::WW);
         assert!(ww_dir.is_some());
         game_dir.info();
@@ -82,9 +78,7 @@ mod tests {
     #[test]
     fn test_unpack_with_auto_game_directory() {
         let mut game_dir = GameDirectory::new();
-        unsafe {
-            game_dir.locate();
-        }
+        game_dir.locate();
         let ww_dir = game_dir.get_game_directory(GameServer::WW);
         assert!(ww_dir.is_some());
 
