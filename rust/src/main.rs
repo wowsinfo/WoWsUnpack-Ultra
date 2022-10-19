@@ -53,4 +53,11 @@ mod tests {
         let result = unpacker.extract("content/GameParams.data", "output");
         assert!(result.is_ok());
     }
+
+    #[test]
+    fn test_unpacker_auto_search() {
+        let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+        let results = unpacker.search("gui*", false);
+        assert!(results.len() > 0);
+    }
 }

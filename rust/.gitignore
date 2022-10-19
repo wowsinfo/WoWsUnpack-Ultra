@@ -2,3 +2,5 @@
 target/
 # test folder
 output/
+# search
+search_results.txt

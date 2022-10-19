@@ -1,5 +1,6 @@
 use flate2::bufread::DeflateDecoder;
 use log::{debug, error, info, warn};
+use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
@@ -554,6 +555,50 @@ impl Unpacker {
         }
 
         return write_file_data(file_path, &raw_data);
+    }
+
+    /**
+     * Search all matching files in the directory tree. 
+     * The search is case insensitive and will treat * as a wildcard.
+     * @param query The query string
+     * @return A list of matching files
+     */
+    pub fn search(&self, query: &str, write_to_disk: bool) -> Vec<String> {
+        let mut results = vec![];
+        let query = query.replace("*", ".*");
+        // don't put this inside the loop as it slows down the search dramatically
+        let regex = Regex::new(&query).unwrap();
+        let mut file = File::create("search_results.txt").unwrap();
+
+        // search from the root
+        let mut stack = vec![&self.directory_tree.root];
+        while !stack.is_empty() {
+            let current = stack.pop();
+            if current.is_none() {
+                continue;
+            }
+
+            let current = current.unwrap();
+            for (_, child) in &current.nodes {
+                stack.push(child);
+            }
+
+            // check if the current node matches the query
+            if current.file.is_none() {
+                continue;
+            }
+
+            let file_record = current.file.as_ref().unwrap();
+            let file_name = &file_record.path;
+            if regex.is_match(&file_name.to_lowercase()) {
+                results.push(file_record.path.clone());
+                if write_to_disk {
+                    writeln!(file, "{}", file_record.path).unwrap();
+                }
+            }
+        }
+
+        results
     }
 }
 
