@@ -1,17 +1,15 @@
+extern crate log;
+use env_logger::Env;
+
 mod game_unpack;
+use game_unpack::Unpacker;
+
 mod helper;
+
 mod text_unpack;
 
-extern crate log;
-use std::thread::panicking;
-
-use env_logger::Env;
-use game_directory::{GameDirectory, GameServer};
-use game_unpack::Unpacker;
-extern crate log;
-use env_logger::Env;
-
 mod game_directory;
+use game_directory::{GameDirectory, GameServer};
 
 fn main() {
     if cfg!(debug_assertions) {
@@ -129,5 +127,12 @@ mod tests {
         assert!(result.is_ok());
         let result = unpacker.extract("content/GameParams.data", "output");
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_unpacker_auto_search() {
+        let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+        let results = unpacker.search("gui*", false);
+        assert!(results.len() > 0);
     }
 }
