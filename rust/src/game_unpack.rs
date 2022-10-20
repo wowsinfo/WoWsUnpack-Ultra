@@ -565,10 +565,34 @@ impl Unpacker {
      */
     pub fn search(&self, query: &str, write_to_disk: bool) -> Vec<String> {
         let mut results = vec![];
+        let mut file = File::create("search_results.txt").unwrap();
+        self.matches(query, &mut |file_record| {
+            results.push(file_record.path.clone());
+            if write_to_disk {
+                writeln!(file, "{}", file_record.path).unwrap();
+            }
+        });
+
+        results
+    }
+
+    pub fn extract_fuzzy(&self, query: &str, dest: &str) -> Result<(), UnpackError> {
+        self.matches(query, &mut |file_record| {
+            self.extract_file(file_record, dest);
+        });
+
+        Ok(())
+    }
+
+    /**
+     * Traverse the tree with the given query. Call the callback when there is a match.
+     * @param query The search query with regex support
+     * @param callback The callback with the FileRecord
+     */
+    fn matches(&self, query: &str, callback: &mut dyn FnMut(&FileRecord)) {
         let query = query.replace("*", ".*");
         // don't put this inside the loop as it slows down the search dramatically
         let regex = Regex::new(&query).unwrap();
-        let mut file = File::create("search_results.txt").unwrap();
 
         // search from the root
         let mut stack = vec![&self.directory_tree.root];
@@ -583,22 +607,17 @@ impl Unpacker {
                 stack.push(child);
             }
 
-            // check if the current node matches the query
             if current.file.is_none() {
                 continue;
             }
-
+            
             let file_record = current.file.as_ref().unwrap();
             let file_name = &file_record.path;
+            // check if the current node matches the query
             if regex.is_match(&file_name.to_lowercase()) {
-                results.push(file_record.path.clone());
-                if write_to_disk {
-                    writeln!(file, "{}", file_record.path).unwrap();
-                }
+                callback(&file_record);
             }
         }
-
-        results
     }
 }
 
