@@ -4,12 +4,76 @@ use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
+use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
+use crate::helper::read_null_terminated_string;
+
 pub type UnpackError = Box<dyn Error>;
 pub type UnpackResult<T> = Result<T, UnpackError>;
+
+// All supported game languages
+#[allow(non_camel_case_types)]
+#[derive(Debug)]
+pub enum GameLanguages {
+    CS,
+    DE,
+    EN,
+    ES,
+    ES_MX,
+    FR,
+    IT,
+    JA,
+    KO,
+    NL,
+    PL,
+    PT,
+    PT_BR,
+    RU,
+    TH,
+    UK,
+    ZH,
+    ZH_SG,
+    ZH_TW,
+}
+
+impl fmt::Display for GameLanguages {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl GameLanguages {
+    fn to_folder_string(&self) -> String {
+        self.to_string().as_str().to_lowercase()
+    }
+
+    fn values() -> Vec<GameLanguages> {
+        vec![
+            GameLanguages::CS,
+            GameLanguages::DE,
+            GameLanguages::EN,
+            GameLanguages::ES,
+            GameLanguages::ES_MX,
+            GameLanguages::FR,
+            GameLanguages::IT,
+            GameLanguages::JA,
+            GameLanguages::KO,
+            GameLanguages::NL,
+            GameLanguages::PL,
+            GameLanguages::PT,
+            GameLanguages::PT_BR,
+            GameLanguages::RU,
+            GameLanguages::TH,
+            GameLanguages::UK,
+            GameLanguages::ZH,
+            GameLanguages::ZH_SG,
+            GameLanguages::ZH_TW,
+        ]
+    }
+}
 
 // the index file header
 const G_IDX_SIGNATURE: [u8; 4] = [0x49, 0x53, 0x46, 0x50];
@@ -356,6 +420,7 @@ impl DirectoryTree {
 pub struct Unpacker {
     directory_tree: DirectoryTree,
     pkg_path: String,
+    text_path: String,
 }
 
 impl Unpacker {
@@ -420,11 +485,13 @@ impl Unpacker {
             return Err(Box::from("PkgPath does not contain res_package"));
         }
 
+        let text_path = idx_path.replace("idx", "res/texts");
         let mut unpacker = Unpacker {
             directory_tree: DirectoryTree {
                 root: TreeNode::new(),
             },
             pkg_path: pkg_path.to_string(),
+            text_path,
         };
 
         for entry in std::fs::read_dir(idx_path)? {
@@ -491,6 +558,11 @@ impl Unpacker {
         }
 
         Ok(())
+    }
+
+    pub fn get_text_file_path(&self, language: GameLanguages) -> String {
+        let folder = language.to_folder_string();
+        return format!("{}/{}/LC_MESSAGES/global.mo", self.text_path, folder);
     }
 
     pub fn extract(&self, query: &str, dest: &str) -> UnpackResult<()> {
@@ -642,35 +714,4 @@ fn write_file_data(file_name: &str, data: &[u8]) -> UnpackResult<()> {
         .open(file_name)?
         .write_all(data)?;
     Ok(())
-}
-
-fn read_null_terminated_string(data: &[u8], offset: usize) -> Option<String> {
-    let mut length = 0;
-    let data_size = data.len();
-    // stop until we find a null character
-    for i in offset..data_size {
-        if data[i] == 0 {
-            length = i - offset;
-            break;
-        }
-    }
-
-    if length == 0 {
-        error!("Invalid String Length");
-        return None;
-    }
-
-    let string_data = &data[offset..(offset + length)];
-    if string_data.len() < length {
-        warn!("String data is smaller than expected");
-        return None;
-    }
-
-    match String::from_utf8(string_data[0..length].to_vec()) {
-        Ok(string) => Some(string),
-        Err(e) => {
-            error!("Failed to deserialize string - {}", e);
-            None
-        }
-    }
 }

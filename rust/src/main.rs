@@ -1,7 +1,10 @@
+mod game_unpack;
+mod helper;
+mod text_unpack;
+
+use game_unpack::Unpacker;
 extern crate log;
 use env_logger::Env;
-mod game_unpack;
-use game_unpack::Unpacker;
 
 fn main() {
     if cfg!(debug_assertions) {
@@ -11,7 +14,9 @@ fn main() {
     }
 
     let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
-    unpacker.extract_exact("gui/dogTags/medium/", "output").unwrap();
+    unpacker
+        .extract_exact("gui/dogTags/medium/", "output")
+        .unwrap();
     unpacker.extract_exact("gui/4k/", "output").unwrap();
     unpacker
         .extract_exact("content/GameParams.data", "output")
@@ -20,7 +25,8 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::game_unpack::Unpacker;
+    use crate::game_unpack::{GameLanguages, Unpacker};
+    use crate::text_unpack::MoFileReader;
 
     #[test]
     fn dummy() {
@@ -67,6 +73,18 @@ mod tests {
     fn test_extract_fuzzy() {
         let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
         let result = unpacker.extract("gui/*ap*", "output");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_mo_file_reader() {
+        let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+        let text_path = unpacker.get_text_file_path(GameLanguages::JA);
+        assert!(text_path.contains("ja/LC_MESSAGES"));
+        let reader = MoFileReader::new(text_path);
+        assert!(reader.is_ok());
+        let reader = reader.unwrap();
+        let result = reader.write_to_file("ja.json".to_string(), "output".to_string());
         assert!(result.is_ok());
     }
 }
