@@ -11,10 +11,10 @@ fn main() {
     }
 
     let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
-    unpacker.extract("gui/dogTags/medium/", "output").unwrap();
-    unpacker.extract("gui/4k/", "output").unwrap();
+    unpacker.extract_exact("gui/dogTags/medium/", "output").unwrap();
+    unpacker.extract_exact("gui/4k/", "output").unwrap();
     unpacker
-        .extract("content/GameParams.data", "output")
+        .extract_exact("content/GameParams.data", "output")
         .unwrap();
 }
 
@@ -35,11 +35,11 @@ mod tests {
         );
         assert!(unpacker.is_ok());
         let unpacker = unpacker.unwrap();
-        let result = unpacker.extract("gui/4k/", "output");
+        let result = unpacker.extract_exact("gui/4k/", "output");
         assert!(result.is_ok());
-        let result = unpacker.extract("content/GameParams.data", "output");
+        let result = unpacker.extract_exact("content/GameParams.data", "output");
         assert!(result.is_ok());
-        let result = unpacker.extract("gui/dogTags", "output");
+        let result = unpacker.extract_exact("gui/dogTags", "output");
         assert!(result.is_ok());
     }
 
@@ -48,9 +48,9 @@ mod tests {
         let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships_PT");
         assert!(unpacker.is_ok());
         let unpacker = unpacker.unwrap();
-        let result = unpacker.extract("gui/4k/", "output");
+        let result = unpacker.extract_exact("gui/4k/", "output");
         assert!(result.is_ok());
-        let result = unpacker.extract("content/GameParams.data", "output");
+        let result = unpacker.extract_exact("content/GameParams.data", "output");
         assert!(result.is_ok());
     }
 
@@ -58,6 +58,15 @@ mod tests {
     fn test_unpacker_auto_search() {
         let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
         let results = unpacker.search("gui*", false);
+        assert!(results.is_ok());
+        let results = results.unwrap();
         assert!(results.len() > 0);
+    }
+
+    #[test]
+    fn test_extract_fuzzy() {
+        let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+        let result = unpacker.extract("gui/*ap*", "output");
+        assert!(result.is_ok());
     }
 }

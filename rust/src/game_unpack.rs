@@ -5,10 +5,11 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 pub type UnpackError = Box<dyn Error>;
+pub type UnpackResult<T> = Result<T, UnpackError>;
 
 // the index file header
 const G_IDX_SIGNATURE: [u8; 4] = [0x49, 0x53, 0x46, 0x50];
@@ -358,7 +359,7 @@ pub struct Unpacker {
 }
 
 impl Unpacker {
-    pub fn new_auto(game_path: &str) -> Result<Self, UnpackError> {
+    pub fn new_auto(game_path: &str) -> UnpackResult<Self> {
         let pkg_path = Path::new(game_path).join("res_packages");
         if !pkg_path.exists() {
             return Err(Box::from("Failed to find res_packages directory"));
@@ -409,7 +410,7 @@ impl Unpacker {
      * @param pkg_path The path to the pkg file
      * @param idx_file The path to the idx file
      */
-    pub fn new(pkg_path: &str, idx_path: &str) -> Result<Self, UnpackError> {
+    pub fn new(pkg_path: &str, idx_path: &str) -> UnpackResult<Self> {
         if !Path::new(idx_path).exists() {
             return Err(Box::from("IdxPath does not exist"));
         }
@@ -461,7 +462,7 @@ impl Unpacker {
         Ok(unpacker)
     }
 
-    pub fn extract(&self, node_name: &str, dest: &str) -> Result<(), UnpackError> {
+    pub fn extract_exact(&self, node_name: &str, dest: &str) -> UnpackResult<()> {
         let node_result = self.directory_tree.find(node_name);
         if node_result.is_none() {
             warn!(
@@ -484,10 +485,19 @@ impl Unpacker {
             if node.file.is_none() {
                 continue;
             }
-            
+
             let file = node.file.as_ref().ok_or("Failed to get file record ref")?;
             self.extract_file(file, dest)?;
         }
+
+        Ok(())
+    }
+
+    pub fn extract(&self, query: &str, dest: &str) -> UnpackResult<()> {
+        self.matches(query, &mut |file_record| {
+            self.extract_file(file_record, dest)?;
+            Ok(())
+        })?;
 
         Ok(())
     }
@@ -498,7 +508,7 @@ impl Unpacker {
      * @param dest The destination path
      * @return true if success
      */
-    fn extract_file(&self, file_record: &FileRecord, dest: &str) -> Result<(), UnpackError> {
+    fn extract_file(&self, file_record: &FileRecord, dest: &str) -> UnpackResult<()> {
         info!("Extracting record: {:?}", file_record);
         let pkg_file_path = Path::new(&self.pkg_path).join(&file_record.pkg_name);
         info!("Pkg file path: {}", pkg_file_path.display());
@@ -542,7 +552,7 @@ impl Unpacker {
         if file_size != file_uncompressed_size {
             let mut decompressed_data = vec![0; file_uncompressed_size];
             let mut decompressor = DeflateDecoder::new(raw_data.as_slice());
-            decompressor.read(&mut decompressed_data).unwrap();
+            decompressor.read(&mut decompressed_data)?;
 
             if decompressed_data.len() != file_uncompressed_size {
                 panic!(
@@ -558,30 +568,23 @@ impl Unpacker {
     }
 
     /**
-     * Search all matching files in the directory tree. 
+     * Search all matching files in the directory tree.
      * The search is case insensitive and will treat * as a wildcard.
      * @param query The query string
      * @return A list of matching files
      */
-    pub fn search(&self, query: &str, write_to_disk: bool) -> Vec<String> {
+    pub fn search(&self, query: &str, write_to_disk: bool) -> UnpackResult<Vec<String>> {
         let mut results = vec![];
         let mut file = File::create("search_results.txt").unwrap();
         self.matches(query, &mut |file_record| {
             results.push(file_record.path.clone());
             if write_to_disk {
-                writeln!(file, "{}", file_record.path).unwrap();
+                writeln!(file, "{}", file_record.path)?;
             }
-        });
+            Ok(())
+        })?;
 
-        results
-    }
-
-    pub fn extract_fuzzy(&self, query: &str, dest: &str) -> Result<(), UnpackError> {
-        self.matches(query, &mut |file_record| {
-            self.extract_file(file_record, dest);
-        });
-
-        Ok(())
+        Ok(results)
     }
 
     /**
@@ -589,7 +592,11 @@ impl Unpacker {
      * @param query The search query with regex support
      * @param callback The callback with the FileRecord
      */
-    fn matches(&self, query: &str, callback: &mut dyn FnMut(&FileRecord)) {
+    fn matches(
+        &self,
+        query: &str,
+        callback: &mut dyn FnMut(&FileRecord) -> Result<(), UnpackError>,
+    ) -> UnpackResult<()> {
         let query = query.replace("*", ".*");
         // don't put this inside the loop as it slows down the search dramatically
         let regex = Regex::new(&query).unwrap();
@@ -610,14 +617,16 @@ impl Unpacker {
             if current.file.is_none() {
                 continue;
             }
-            
+
             let file_record = current.file.as_ref().unwrap();
             let file_name = &file_record.path;
             // check if the current node matches the query
             if regex.is_match(&file_name.to_lowercase()) {
-                callback(&file_record);
+                callback(&file_record)?;
             }
         }
+
+        Ok(())
     }
 }
 
@@ -625,7 +634,7 @@ impl Unpacker {
 /// Helpers
 ///
 
-fn write_file_data(file_name: &str, data: &[u8]) -> Result<(), UnpackError> {
+fn write_file_data(file_name: &str, data: &[u8]) -> UnpackResult<()> {
     // write the data
     OpenOptions::new()
         .write(true)
@@ -652,25 +661,16 @@ fn read_null_terminated_string(data: &[u8], offset: usize) -> Option<String> {
     }
 
     let string_data = &data[offset..(offset + length)];
-    return match take_string(string_data, length) {
-        Some(s) => Some(s),
-        None => {
-            error!("Failed to read string");
-            None
-        }
-    };
-}
-
-fn take_string(data: &[u8], size: usize) -> Option<String> {
-    if data.len() >= size {
-        return match String::from_utf8(data[0..size].to_vec()) {
-            Ok(string) => Some(string),
-            Err(e) => {
-                error!("Failed to deserialize string - {}", e);
-                None
-            }
-        };
+    if string_data.len() < length {
+        warn!("String data is smaller than expected");
+        return None;
     }
 
-    return None;
+    match String::from_utf8(string_data[0..length].to_vec()) {
+        Ok(string) => Some(string),
+        Err(e) => {
+            error!("Failed to deserialize string - {}", e);
+            None
+        }
+    }
 }
