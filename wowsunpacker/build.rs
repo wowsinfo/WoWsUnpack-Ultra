@@ -8,15 +8,15 @@ fn main() {
     msbuild.args([
         "&&",
         "msbuild",
-        "..\\wowsunpack\\wowsunpack.sln",
+        "..\\paramsunpack\\wowsunpack.sln",
         "/p:Configuration=Release",
         "/p:Platform=Any CPU",
     ]);
     println!("{:?}", msbuild);
-    msbuild.status().expect("Failed to build wowsunpack");
+    msbuild.status().expect("Failed to build paramsunpack");
 
     // make sure the DLL is under bin/release
-    let dll_path = Path::new("../wowsunpack/wowsunpack/bin/Release");
+    let dll_path = Path::new("../paramsunpack/wowsunpack/bin/Release");
     if !dll_path.exists() {
         panic!("Release folder not found");
     }

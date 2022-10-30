@@ -1,8 +1,7 @@
 extern crate winreg;
 use log::{info, warn};
 use std::{collections::HashMap, path::Path};
-use winreg::enums::*;
-use winreg::RegKey;
+use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum GameServer {

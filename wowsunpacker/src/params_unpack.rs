@@ -1,6 +1,5 @@
+use crate::utils::UnpackResult;
 use std::ffi::{c_char, c_int, CString};
-
-use crate::game_unpack::UnpackResult;
 
 pub fn params_unpack(path: &str, compact: bool) -> UnpackResult<()> {
     unsafe {

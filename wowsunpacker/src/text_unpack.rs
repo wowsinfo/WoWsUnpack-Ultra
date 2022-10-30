@@ -7,23 +7,20 @@ use std::{
     path::Path,
 };
 
-use log::{info, debug};
+use log::{debug, info};
 use serde::Deserialize;
 
-use crate::{
-    game_unpack::{UnpackResult},
-    helper::read_null_terminated_string,
-};
+use crate::utils::{read_null_terminated_string, UnpackResult};
 
 #[derive(Debug, Deserialize)]
 struct MoHeader {
     magic: u32,
-    revision: u32,
+    _revision: u32,
     num_strings: u32,
     offset_originals: u32,
     offset_translations: u32,
-    table_size: u32,
-    table_offset: u32,
+    _table_size: u32,
+    _table_offset: u32,
 }
 
 impl MoHeader {
@@ -45,7 +42,6 @@ struct MoEntry {
 
 pub struct MoFileReader {
     text_data: HashMap<String, String>,
-    header: MoHeader,
 }
 
 impl MoFileReader {
@@ -71,7 +67,10 @@ impl MoFileReader {
             // some string has null terminator in the middle so it is shorter than the expected length
             // we allow it here because because the actual string seems to be duplicated twice or more
             if key_string.len() > mo_entry.length as usize {
-                panic!("Key string {} is longer than length {}", key_string, mo_entry.length);
+                panic!(
+                    "Key string {} is longer than length {}",
+                    key_string, mo_entry.length
+                );
             }
 
             // get the translation value
@@ -81,12 +80,15 @@ impl MoFileReader {
             let value_string = read_null_terminated_string(&data, mo_entry.offset as usize)
                 .unwrap_or(String::from(""));
             if value_string.len() > mo_entry.length as usize {
-                panic!("Value string {} is longer than length {}", value_string, mo_entry.length);
+                panic!(
+                    "Value string {} is longer than length {}",
+                    value_string, mo_entry.length
+                );
             }
 
             text_data.insert(key_string, value_string);
         }
-        Ok(Self { text_data, header })
+        Ok(Self { text_data })
     }
 
     pub fn write_to_file(&self, file_name: String, dest: String) -> UnpackResult<()> {

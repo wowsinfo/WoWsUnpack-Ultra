@@ -172,21 +172,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
 
 [[package]]
-name = "rust"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "env_logger",
- "flate2",
- "libloading",
- "log",
- "regex",
- "serde",
- "serde_json",
- "winreg",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -287,4 +272,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "80d0f4e272c85def139476380b12f9ac60926689dd2e01d4923222f40580869d"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "wowsunpacker"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "env_logger",
+ "flate2",
+ "libloading",
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "winreg",
 ]

@@ -1,18 +1,13 @@
+use crate::utils::{read_null_terminated_string, write_file_data, UnpackError, UnpackResult};
 use flate2::bufread::DeflateDecoder;
 use log::{debug, error, info, warn};
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::error::Error;
 use std::fmt;
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
-
-use crate::helper::read_null_terminated_string;
-
-pub type UnpackError = Box<dyn Error>;
-pub type UnpackResult<T> = Result<T, UnpackError>;
 
 // All supported game languages
 #[allow(non_camel_case_types)]
@@ -703,15 +698,48 @@ impl Unpacker {
 }
 
 ///
-/// Helpers
+/// Tests
 ///
 
-fn write_file_data(file_name: &str, data: &[u8]) -> UnpackResult<()> {
-    // write the data
-    OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open(file_name)?
-        .write_all(data)?;
-    Ok(())
+#[test]
+fn test_unpacker_new() {
+    let unpacker = Unpacker::new(
+        r"C:\Games\World_of_Warships\res_packages",
+        r"C:\Games\World_of_Warships\bin\5771708\idx",
+    );
+    assert!(unpacker.is_ok());
+    let unpacker = unpacker.unwrap();
+    let result = unpacker.extract_exact("gui/4k/", "output");
+    assert!(result.is_ok());
+    let result = unpacker.extract_exact("content/GameParams.data", "output");
+    assert!(result.is_ok());
+    let result = unpacker.extract_exact("gui/dogTags", "output");
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_unpacker_new_auto() {
+    let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships_PT");
+    assert!(unpacker.is_ok());
+    let unpacker = unpacker.unwrap();
+    let result = unpacker.extract_exact("gui/4k/", "output");
+    assert!(result.is_ok());
+    let result = unpacker.extract_exact("content/GameParams.data", "output");
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_unpacker_auto_search() {
+    let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+    let results = unpacker.search("gui*", false);
+    assert!(results.is_ok());
+    let results = results.unwrap();
+    assert!(results.len() > 0);
+}
+
+#[test]
+fn test_extract_fuzzy() {
+    let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+    let result = unpacker.extract("gui/*ap*", "output");
+    assert!(result.is_ok());
 }
