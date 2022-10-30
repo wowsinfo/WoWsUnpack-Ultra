@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod test_mo_file_reader {
     use wowsunpacker::{
-        game_unpack::{GameLanguages, Unpacker},
-        text_unpack::MoFileReader,
+        game_unpack::Unpacker,
+        text_unpack::{GameLanguages, MoFileReader},
     };
 
     #[test]
     fn read_japanese_mo() {
         let unpacker = Unpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
-        let text_path = unpacker.get_text_file_path(GameLanguages::JA);
+        let text_path = unpacker.get_text_file_path(&GameLanguages::JA);
         assert!(text_path.contains("ja/LC_MESSAGES"));
         let reader = MoFileReader::new(text_path);
         assert!(reader.is_ok());
