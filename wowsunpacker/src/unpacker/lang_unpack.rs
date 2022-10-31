@@ -2,16 +2,17 @@
 
 use std::{
     collections::HashMap,
+    fmt,
     fs::File,
     io::{Read, Write},
-    path::Path, fmt,
+    path::Path,
 };
 
-use log::{debug, info};
+use log::{debug, info, warn};
 use serde::Deserialize;
 
-use crate::utils::functions::{read_null_terminated_string};
 use crate::types::UnpackResult;
+use crate::utils::functions::read_null_terminated_string;
 
 #[derive(Debug, Deserialize)]
 struct MoHeader {
@@ -42,18 +43,38 @@ struct MoEntry {
 }
 
 pub struct LangUnpacker {
+    file_path: String,
     text_data: HashMap<String, String>,
+    decoded: bool,
 }
 
 impl LangUnpacker {
-    pub fn new(file_name: String) -> UnpackResult<Self> {
-        let mut file = File::open(file_name)?;
+    pub fn new(file_path: String) -> UnpackResult<Self> {
+        // validate the file exists
+        if !Path::new(&file_path).exists() {
+            return Err(Box::from(format!("File {} does not exist", file_path)));
+        }
+
+        Ok(Self {
+            file_path,
+            text_data: HashMap::new(),
+            decoded: false,
+        })
+    }
+
+    pub fn decode(&mut self) -> UnpackResult<()> {
+        if self.decoded {
+            warn!("Text data already decoded");
+            return Ok(());
+        }
+
+        let mut file = File::open(&mut self.file_path)?;
         let mut data = Vec::new();
         file.read_to_end(&mut data)?;
         let header = MoHeader::parse(&data).ok_or("Invalid MO file")?;
         info!("{:?}", header);
 
-        let mut text_data = HashMap::new();
+        let text_data = &mut self.text_data;
 
         let key_offset = header.offset_originals;
         let value_offset = header.offset_translations;
@@ -89,10 +110,16 @@ impl LangUnpacker {
 
             text_data.insert(key_string, value_string);
         }
-        Ok(Self { text_data })
+
+        self.decoded = true;
+        Ok(())
     }
 
     pub fn write_to_file(&self, file_name: String, dest: String) -> UnpackResult<()> {
+        if !self.decoded {
+            return Err(Box::from("Text data is not decoded yet, call decode() before writing"));
+        }
+
         let file_path = Path::new(&dest).join(file_name);
         let mut file = File::create(file_path)?;
         // encode it to json
@@ -104,7 +131,7 @@ impl LangUnpacker {
 
 ///
 /// All supported game languages
-/// 
+///
 
 #[allow(non_camel_case_types)]
 #[derive(Debug)]

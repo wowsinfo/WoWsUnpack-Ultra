@@ -14,7 +14,8 @@ fn main() {
     for lang in GameLanguages::values().iter() {
         println!("Unpacking language: {}", lang);
         let lang_dir = unpacker.get_text_file_path(lang);
-        let reader = LangUnpacker::new(lang_dir).unwrap();
+        let mut reader = LangUnpacker::new(lang_dir).unwrap();
+        reader.decode().unwrap();
         reader
             .write_to_file(lang.to_filename(), "output".to_string())
             .unwrap();
