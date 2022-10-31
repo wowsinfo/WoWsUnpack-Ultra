@@ -3,7 +3,15 @@ use std::{path::Path, process::Command};
 
 fn main() {
     // build the visual studio solution with msbuild by using the script
-    let env = r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsamd64_x86.bat";
+    let mut env = r"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsamd64_x86.bat";
+    // fallback to 2019
+    if !Path::new(env).exists() {
+        env = r"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsamd64_x86.bat";
+    }
+    if !Path::new(env).exists() {
+        panic!("Visual Studio not found");
+    }
+
     let mut msbuild = Command::new(env);
     msbuild.args([
         "&&",
