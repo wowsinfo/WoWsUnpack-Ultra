@@ -9,11 +9,11 @@ fn main() {
     }
 
     let ww_dir = ww_dir.unwrap();
-    let unpacker = GameUnpacker::new_auto(ww_dir).unwrap();
+    let unpacker = GameUnpacker::auto(ww_dir).unwrap();
 
     for lang in GameLanguages::values().iter() {
         println!("Unpacking language: {}", lang);
-        let lang_dir = unpacker.get_text_file_path(lang);
+        let lang_dir = unpacker.get_lang_path(lang);
         let mut reader = LangUnpacker::new(lang_dir).unwrap();
         reader.decode().unwrap();
         reader

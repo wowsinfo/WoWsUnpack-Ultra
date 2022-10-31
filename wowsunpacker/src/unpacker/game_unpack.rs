@@ -359,7 +359,7 @@ pub struct GameUnpacker {
 }
 
 impl GameUnpacker {
-    pub fn new_auto(game_path: &str) -> UnpackResult<Self> {
+    pub fn auto(game_path: &str) -> UnpackResult<Self> {
         let pkg_path = Path::new(game_path).join("res_packages");
         if !pkg_path.exists() {
             return Err(Box::from("Failed to find res_packages directory"));
@@ -402,7 +402,7 @@ impl GameUnpacker {
         info!("Idx path: {}", idx_path);
         info!("Pkg path: {}", pkg_path);
 
-        return Self::new(pkg_path, idx_path);
+        return Self::manual(pkg_path, idx_path);
     }
 
     /**
@@ -410,7 +410,7 @@ impl GameUnpacker {
      * @param pkg_path The path to the pkg file
      * @param idx_file The path to the idx file
      */
-    pub fn new(pkg_path: &str, idx_path: &str) -> UnpackResult<Self> {
+    pub fn manual(pkg_path: &str, idx_path: &str) -> UnpackResult<Self> {
         if !Path::new(idx_path).exists() {
             // This can happen when the game downloads parts of the new version
             return Err(Box::from(format!("Failed to find idx file: {}", idx_path)));
@@ -496,7 +496,7 @@ impl GameUnpacker {
         Ok(())
     }
 
-    pub fn get_text_file_path(&self, language: &GameLanguages) -> String {
+    pub fn get_lang_path(&self, language: &GameLanguages) -> String {
         let folder = language.to_folder_string();
         return format!("{}/{}/LC_MESSAGES/global.mo", self.text_path, folder);
     }
@@ -644,7 +644,7 @@ impl GameUnpacker {
 
 #[test]
 fn test_unpacker_new() {
-    let unpacker = GameUnpacker::new(
+    let unpacker = GameUnpacker::manual(
         r"C:\Games\World_of_Warships\res_packages",
         r"C:\Games\World_of_Warships\bin\5771708\idx",
     );
@@ -660,7 +660,7 @@ fn test_unpacker_new() {
 
 #[test]
 fn test_unpacker_new_auto() {
-    let unpacker = GameUnpacker::new_auto(r"C:\Games\World_of_Warships_PT");
+    let unpacker = GameUnpacker::auto(r"C:\Games\World_of_Warships_PT");
     assert!(unpacker.is_ok());
     let unpacker = unpacker.unwrap();
     let result = unpacker.extract_exact("gui/4k/", "output");
@@ -671,7 +671,7 @@ fn test_unpacker_new_auto() {
 
 #[test]
 fn test_unpacker_auto_search() {
-    let unpacker = GameUnpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+    let unpacker = GameUnpacker::auto(r"C:\Games\World_of_Warships").unwrap();
     let results = unpacker.search("gui*", false);
     assert!(results.is_ok());
     let results = results.unwrap();
@@ -680,7 +680,7 @@ fn test_unpacker_auto_search() {
 
 #[test]
 fn test_extract_fuzzy() {
-    let unpacker = GameUnpacker::new_auto(r"C:\Games\World_of_Warships").unwrap();
+    let unpacker = GameUnpacker::auto(r"C:\Games\World_of_Warships").unwrap();
     let result = unpacker.extract("gui/*ap*", "output");
     assert!(result.is_ok());
 }

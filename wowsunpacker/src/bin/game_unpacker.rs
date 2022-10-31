@@ -10,7 +10,7 @@ fn main() {
     }
 
     let ww_dir = ww_dir.unwrap();
-    let unpacker = GameUnpacker::new_auto(ww_dir).unwrap();
+    let unpacker = GameUnpacker::auto(ww_dir).unwrap();
     unpacker
         .extract_exact("gui/dogTags/medium/", "output")
         .unwrap();
