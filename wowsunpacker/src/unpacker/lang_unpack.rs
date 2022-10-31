@@ -10,7 +10,8 @@ use std::{
 use log::{debug, info};
 use serde::Deserialize;
 
-use crate::utils::{read_null_terminated_string, UnpackResult};
+use crate::utils::functions::{read_null_terminated_string};
+use crate::types::UnpackResult;
 
 #[derive(Debug, Deserialize)]
 struct MoHeader {
@@ -40,11 +41,11 @@ struct MoEntry {
     offset: u32,
 }
 
-pub struct MoFileReader {
+pub struct LangUnpacker {
     text_data: HashMap<String, String>,
 }
 
-impl MoFileReader {
+impl LangUnpacker {
     pub fn new(file_name: String) -> UnpackResult<Self> {
         let mut file = File::open(file_name)?;
         let mut data = Vec::new();

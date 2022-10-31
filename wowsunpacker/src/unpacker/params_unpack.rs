@@ -1,7 +1,8 @@
-use crate::utils::UnpackResult;
+use crate::types::UnpackResult;
 use std::ffi::{c_char, c_int, CString};
 
-pub fn params_unpack(path: &str, compact: bool) -> UnpackResult<()> {
+#[allow(non_snake_case)]
+pub fn ParamsUnpack(path: &str, compact: bool) -> UnpackResult<()> {
     unsafe {
         let lib = libloading::Library::new("HenryQuan.WoWsUnpack.dll")?;
         let func: libloading::Symbol<unsafe extern "C" fn(*const c_char, c_int)> =

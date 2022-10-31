@@ -1,5 +1,4 @@
 use wowsunpacker::{
-    self,
     game_directory::{GameDirectory, GameServer},
     game_unpack::Unpacker,
 };

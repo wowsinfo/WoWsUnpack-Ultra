@@ -1,8 +1,4 @@
-use wowsunpacker::{
-    game_directory::{GameDirectory, GameServer},
-    game_unpack::Unpacker,
-    text_unpack::{GameLanguages, MoFileReader},
-};
+use wowsunpacker::{GameDirectory, GameLanguages, GameServer, GameUnpacker, LangUnpacker};
 
 fn main() {
     let mut game_dir = GameDirectory::new();
@@ -13,12 +9,12 @@ fn main() {
     }
 
     let ww_dir = ww_dir.unwrap();
-    let unpacker = Unpacker::new_auto(ww_dir).unwrap();
+    let unpacker = GameUnpacker::new_auto(ww_dir).unwrap();
 
     for lang in GameLanguages::values().iter() {
         println!("Unpacking language: {}", lang);
         let lang_dir = unpacker.get_text_file_path(lang);
-        let reader = MoFileReader::new(lang_dir).unwrap();
+        let reader = LangUnpacker::new(lang_dir).unwrap();
         reader
             .write_to_file(lang.to_filename(), "output".to_string())
             .unwrap();

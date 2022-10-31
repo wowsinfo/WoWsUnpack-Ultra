@@ -1,8 +1,6 @@
+use crate::types::UnpackResult;
 use log::{error, warn};
-use std::{error::Error, fs::OpenOptions, io::Write};
-
-pub type UnpackError = Box<dyn Error>;
-pub type UnpackResult<T> = Result<T, UnpackError>;
+use std::{fs::OpenOptions, io::Write};
 
 pub fn read_null_terminated_string(data: &[u8], offset: usize) -> Option<String> {
     let mut length = 0;
