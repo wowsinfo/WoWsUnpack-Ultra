@@ -14,7 +14,7 @@ pub fn read_null_terminated_string(data: &[u8], offset: usize) -> Option<String>
     }
 
     if length == 0 {
-        error!("Invalid String Length");
+        warn!("Invalid String Length");
         return None;
     }
 

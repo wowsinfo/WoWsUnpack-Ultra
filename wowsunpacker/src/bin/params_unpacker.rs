@@ -1,4 +1,4 @@
-use wowsunpacker::ParamsUnpacker;
+use wowsunpacker::unpacker::ParamsUnpacker;
 
 
 fn main() {

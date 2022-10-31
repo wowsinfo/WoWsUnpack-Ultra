@@ -1,6 +1,6 @@
 extern crate winreg;
 use log::{info, warn};
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, fmt, path::Path};
 use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
 #[derive(Debug, Hash, PartialEq, Eq)]
@@ -85,5 +85,73 @@ impl GameDirectory {
 
     pub fn get_game_directory(&self, server: GameServer) -> Option<&String> {
         self.game_directory_info.get(&server)
+    }
+}
+
+///
+/// All supported game languages
+///
+
+#[allow(non_camel_case_types)]
+#[derive(Debug)]
+pub enum GameLanguages {
+    CS,
+    DE,
+    EN,
+    ES,
+    ES_MX,
+    FR,
+    IT,
+    JA,
+    KO,
+    NL,
+    PL,
+    PT,
+    PT_BR,
+    RU,
+    TH,
+    UK,
+    ZH,
+    ZH_SG,
+    ZH_TW,
+}
+
+impl fmt::Display for GameLanguages {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl GameLanguages {
+    pub fn to_folder_string(&self) -> String {
+        self.to_string().to_lowercase()
+    }
+
+    pub fn to_filename(&self) -> String {
+        format!("{}.json", self.to_folder_string())
+    }
+
+    pub fn values() -> Vec<GameLanguages> {
+        vec![
+            GameLanguages::CS,
+            GameLanguages::DE,
+            GameLanguages::EN,
+            GameLanguages::ES,
+            GameLanguages::ES_MX,
+            GameLanguages::FR,
+            GameLanguages::IT,
+            GameLanguages::JA,
+            GameLanguages::KO,
+            GameLanguages::NL,
+            GameLanguages::PL,
+            GameLanguages::PT,
+            GameLanguages::PT_BR,
+            GameLanguages::RU,
+            GameLanguages::TH,
+            GameLanguages::UK,
+            GameLanguages::ZH,
+            GameLanguages::ZH_SG,
+            GameLanguages::ZH_TW,
+        ]
     }
 }

@@ -1,6 +1,6 @@
-use super::lang_unpack::GameLanguages;
 use crate::types::{UnpackError, UnpackResult};
 use crate::utils::functions::{read_null_terminated_string, write_file_data};
+use crate::utils::game::GameLanguages;
 use flate2::bufread::DeflateDecoder;
 use log::{debug, error, info, warn};
 use regex::Regex;
@@ -86,8 +86,7 @@ impl Node {
         // print the pointer in its hex form
         debug!("String pointer 0x{:x}", pointer);
 
-        let name =
-            read_null_terminated_string(full_data, pointer as usize).unwrap_or("".to_string());
+        let name = read_null_terminated_string(full_data, pointer as usize).unwrap_or_default();
         debug!("Node name: {}", name);
 
         let id = bincode::deserialize(&data[16..24]).expect("Failed to deserialize node id");
@@ -355,6 +354,7 @@ impl DirectoryTree {
 pub struct GameUnpacker {
     directory_tree: DirectoryTree,
     pkg_path: String,
+    idx_path: String,
     text_path: String,
 }
 
@@ -372,7 +372,7 @@ impl GameUnpacker {
         }
 
         // filter out folders in bin_path
-        let mut latest_folder = 0;
+        let mut folder_numebers: Vec<u32> = Vec::new();
         for entry in std::fs::read_dir(bin_path)? {
             let entry = entry?;
             let path = entry.path();
@@ -383,14 +383,29 @@ impl GameUnpacker {
                     .to_str()
                     .ok_or("Failed to get folder name")?;
                 if let Ok(folder_num) = folder_name.parse::<u32>() {
-                    if folder_num > latest_folder {
-                        latest_folder = folder_num;
-                    }
+                    folder_numebers.push(folder_num);
                 }
             }
         }
 
-        let latest_folder = latest_folder.to_string();
+        let mut latest_folder: Option<String> = None;
+        // starting from the latest, we need to validate it
+        // (a newer folder may be there for faster updates, but it is not complete)
+        folder_numebers.sort();
+        folder_numebers.reverse();
+        for folder_num in folder_numebers {
+            let folder_name = folder_num.to_string();
+            let idx_path = Path::new(game_path)
+                .join("bin")
+                .join(&folder_name)
+                .join("idx");
+            if idx_path.exists() {
+                latest_folder = Some(folder_name.to_string());
+                break;
+            }
+        }
+
+        let latest_folder = latest_folder.ok_or("Failed to find idx folder")?;
         // game_path/bin/latest_folder
         let idx_path = Path::new(game_path)
             .join("bin")
@@ -422,15 +437,18 @@ impl GameUnpacker {
         }
 
         let text_path = idx_path.replace("idx", "res/texts");
-        let mut unpacker = GameUnpacker {
+        Ok(GameUnpacker {
             directory_tree: DirectoryTree {
                 root: TreeNode::new(),
             },
             pkg_path: pkg_path.to_string(),
+            idx_path: idx_path.to_string(),
             text_path,
-        };
+        })
+    }
 
-        for entry in std::fs::read_dir(idx_path)? {
+    pub fn build_directory_tree(&mut self) -> UnpackResult<()> {
+        for entry in std::fs::read_dir(self.idx_path.to_string())? {
             let entry = entry?;
             let path = entry.path();
             if path.is_file() && path.extension().unwrap() == "idx" {
@@ -450,7 +468,7 @@ impl GameUnpacker {
                 let idx_file = IdxFile::parse(&data).ok_or("Failed to parse idx file")?;
                 info!("Parsed idx file: {}", filename);
                 for (path, file_record) in idx_file.files {
-                    unpacker.directory_tree.insert(&FileRecord {
+                    self.directory_tree.insert(&FileRecord {
                         pkg_name: idx_file.pkg_name.clone(),
                         path,
                         id: file_record.id,
@@ -462,7 +480,7 @@ impl GameUnpacker {
             }
         }
 
-        Ok(unpacker)
+        Ok(())
     }
 
     pub fn extract_exact(&self, node_name: &str, dest: &str) -> UnpackResult<()> {

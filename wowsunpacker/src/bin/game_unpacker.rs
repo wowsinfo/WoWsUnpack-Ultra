@@ -1,4 +1,7 @@
-use wowsunpacker::{GameDirectory, GameServer, GameUnpacker};
+use wowsunpacker::{
+    game::{GameDirectory, GameServer},
+    unpacker::GameUnpacker,
+};
 
 fn main() {
     let mut game_dir = GameDirectory::new();
@@ -10,7 +13,8 @@ fn main() {
     }
 
     let ww_dir = ww_dir.unwrap();
-    let unpacker = GameUnpacker::auto(ww_dir).unwrap();
+    let mut unpacker = GameUnpacker::auto(ww_dir).unwrap();
+    unpacker.build_directory_tree().unwrap();
     unpacker
         .extract_exact("gui/dogTags/medium/", "output")
         .unwrap();

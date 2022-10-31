@@ -1,2 +1,4 @@
 pub mod functions;
-pub mod game_directory;
+pub mod game;
+
+// add tests here

@@ -1,10 +1,30 @@
 extern crate log;
-mod unpacker;
+mod unpack;
 mod utils;
 
 // only export whatever needed here
 pub mod types;
-pub use crate::unpacker::game_unpack::GameUnpacker;
-pub use crate::unpacker::lang_unpack::{GameLanguages, LangUnpacker};
-pub use crate::unpacker::params_unpack::ParamsUnpacker;
-pub use crate::utils::game_directory::{GameDirectory, GameServer};
+
+// allow users to show more info in debug mode
+pub mod logger {
+    extern crate log;
+    use env_logger::Env;
+
+    pub fn setup_logger() {
+        if cfg!(debug_assertions) {
+            env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+        } else {
+            env_logger::Builder::from_env(Env::default().default_filter_or("off")).init();
+        }
+    }
+}
+
+pub mod unpacker {
+    pub use crate::unpack::game_unpack::GameUnpacker;
+    pub use crate::unpack::lang_unpack::LangUnpacker;
+    pub use crate::unpack::params_unpack::ParamsUnpacker;
+}
+
+pub mod game {
+    pub use crate::utils::game::{GameDirectory, GameLanguages, GameServer};
+}

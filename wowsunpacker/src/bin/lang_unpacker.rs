@@ -1,6 +1,11 @@
-use wowsunpacker::{GameDirectory, GameLanguages, GameServer, GameUnpacker, LangUnpacker};
+use wowsunpacker::{
+    game::{GameDirectory, GameLanguages, GameServer},
+    logger::setup_logger,
+    unpacker::{GameUnpacker, LangUnpacker},
+};
 
 fn main() {
+    setup_logger();
     let mut game_dir = GameDirectory::new();
     game_dir.locate();
     let ww_dir = game_dir.get_game_directory(GameServer::WW);

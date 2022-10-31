@@ -1,6 +1,9 @@
 #[cfg(test)]
 mod test_mo_file_reader {
-    use wowsunpacker::{GameLanguages, GameUnpacker, LangUnpacker};
+    use wowsunpacker::{
+        game::GameLanguages,
+        unpacker::{GameUnpacker, LangUnpacker},
+    };
 
     #[test]
     fn read_japanese_mo() {
@@ -9,7 +12,9 @@ mod test_mo_file_reader {
         assert!(text_path.contains("ja/LC_MESSAGES"));
         let reader = LangUnpacker::new(text_path);
         assert!(reader.is_ok());
-        let reader = reader.unwrap();
+        let mut reader = reader.unwrap();
+        let result = reader.decode();
+        assert!(result.is_ok());
         let result = reader.write_to_file("ja.json".to_string(), "output".to_string());
         assert!(result.is_ok());
     }
