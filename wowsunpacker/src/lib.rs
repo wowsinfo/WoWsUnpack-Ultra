@@ -10,11 +10,15 @@ pub mod logger {
     extern crate log;
     use env_logger::Env;
 
-    pub fn setup_logger() {
+    pub fn setup_default_logger() {
+        setup_logger("info", "off");
+    }
+
+    pub fn setup_logger(debug: &str, release: &str) {
         if cfg!(debug_assertions) {
-            env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
+            env_logger::Builder::from_env(Env::default().default_filter_or(debug)).init();
         } else {
-            env_logger::Builder::from_env(Env::default().default_filter_or("off")).init();
+            env_logger::Builder::from_env(Env::default().default_filter_or(release)).init();
         }
     }
 }

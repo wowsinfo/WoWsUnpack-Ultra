@@ -21,11 +21,3 @@ impl ParamsUnpacker {
         }
     }
 }
-
-#[test]
-fn test_params_unpack() {
-    let unpacker = ParamsUnpacker::new().unwrap();
-    unpacker
-        .unpack("../../output/content/GameParams.data", false)
-        .unwrap();
-}

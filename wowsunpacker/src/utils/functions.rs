@@ -2,7 +2,7 @@ use crate::types::UnpackResult;
 use log::{error, warn};
 use std::{fs::OpenOptions, io::Write};
 
-pub fn read_null_terminated_string(data: &[u8], offset: usize) -> Option<String> {
+pub fn read_string(data: &[u8], offset: usize) -> Option<String> {
     let mut length = 0;
     let data_size = data.len();
     // stop until we find a null character

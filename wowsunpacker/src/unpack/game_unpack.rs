@@ -1,5 +1,5 @@
 use crate::types::{UnpackError, UnpackResult};
-use crate::utils::functions::{read_null_terminated_string, write_file_data};
+use crate::utils::functions::{read_string, write_file_data};
 use crate::utils::game::GameLanguages;
 use flate2::bufread::DeflateDecoder;
 use log::{debug, error, info, warn};
@@ -30,7 +30,7 @@ impl IdxHeader {
     fn parse(data: &[u8]) -> Option<IdxHeader> {
         let data_size = data.len() as u32;
         if data_size != HEADER_SIZE {
-            log::error!("Invalid IdxHeader size {}", data_size);
+            error!("Invalid IdxHeader size {}", data_size);
             return None;
         }
 
@@ -86,7 +86,7 @@ impl Node {
         // print the pointer in its hex form
         debug!("String pointer 0x{:x}", pointer);
 
-        let name = read_null_terminated_string(full_data, pointer as usize).unwrap_or_default();
+        let name = read_string(full_data, pointer as usize).unwrap_or_default();
         debug!("Node name: {}", name);
 
         let id = bincode::deserialize(&data[16..24]).expect("Failed to deserialize node id");
@@ -252,7 +252,7 @@ impl IdxFile {
         let trailer_data = &data[trailer_offset..];
         // the name starts from byte 24
         let trailer_data = &trailer_data[24..];
-        let pkg_name = read_null_terminated_string(trailer_data, 0);
+        let pkg_name = read_string(trailer_data, 0);
         if pkg_name.is_none() {
             error!("Failed to get file pkg name");
             return None;
@@ -447,7 +447,7 @@ impl GameUnpacker {
         })
     }
 
-    pub fn build_directory_tree(&mut self) -> UnpackResult<()> {
+    pub fn build_directory_tree(&mut self) -> UnpackResult<&Self> {
         for entry in std::fs::read_dir(self.idx_path.to_string())? {
             let entry = entry?;
             let path = entry.path();
@@ -480,17 +480,22 @@ impl GameUnpacker {
             }
         }
 
-        Ok(())
+        Ok(self)
     }
 
-    pub fn extract_exact(&self, node_name: &str, dest: &str) -> UnpackResult<()> {
+    pub fn get_lang_path(&self, language: &GameLanguages) -> String {
+        let folder = language.to_folder_string();
+        return format!("{}/{}/LC_MESSAGES/global.mo", self.text_path, folder);
+    }
+
+    pub fn extract_exact(&self, node_name: &str, dest: &str) -> UnpackResult<&Self> {
         let node_result = self.directory_tree.find(node_name);
         if node_result.is_none() {
             warn!(
                 "There exists no node with name {} in directory tree",
                 node_name
             );
-            return Ok(());
+            return Ok(self);
         }
 
         // extract the node
@@ -511,21 +516,16 @@ impl GameUnpacker {
             self.extract_file(file, dest)?;
         }
 
-        Ok(())
+        Ok(self)
     }
 
-    pub fn get_lang_path(&self, language: &GameLanguages) -> String {
-        let folder = language.to_folder_string();
-        return format!("{}/{}/LC_MESSAGES/global.mo", self.text_path, folder);
-    }
-
-    pub fn extract(&self, query: &str, dest: &str) -> UnpackResult<()> {
+    pub fn extract_fuzzy(&self, query: &str, dest: &str) -> UnpackResult<&Self> {
         self.matches(query, &mut |file_record| {
             self.extract_file(file_record, dest)?;
             Ok(())
         })?;
 
-        Ok(())
+        Ok(self)
     }
 
     /**
@@ -699,6 +699,6 @@ fn test_unpacker_auto_search() {
 #[test]
 fn test_extract_fuzzy() {
     let unpacker = GameUnpacker::auto(r"C:\Games\World_of_Warships").unwrap();
-    let result = unpacker.extract("gui/*ap*", "output");
+    let result = unpacker.extract_fuzzy("gui/*ap*", "output");
     assert!(result.is_ok());
 }

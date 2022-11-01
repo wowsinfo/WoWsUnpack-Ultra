@@ -7,7 +7,9 @@ mod test_mo_file_reader {
 
     #[test]
     fn read_japanese_mo() {
-        let unpacker = GameUnpacker::auto(r"C:\Games\World_of_Warships").unwrap();
+        let unpacker = GameUnpacker::auto(r"C:\Games\World_of_Warships");
+        assert!(unpacker.is_ok());
+        let unpacker = unpacker.unwrap();
         let text_path = unpacker.get_lang_path(&GameLanguages::JA);
         assert!(text_path.contains("ja/LC_MESSAGES"));
         let reader = LangUnpacker::new(text_path);
@@ -15,7 +17,7 @@ mod test_mo_file_reader {
         let mut reader = reader.unwrap();
         let result = reader.decode();
         assert!(result.is_ok());
-        let result = reader.write_to_file("ja.json".to_string(), "output".to_string());
+        let result = reader.write_to_file("ja.json", "output");
         assert!(result.is_ok());
     }
 }

@@ -7,11 +7,11 @@ use std::{
     path::Path,
 };
 
-use log::{debug, info, warn};
+use log::{debug, info, warn, error};
 use serde::Deserialize;
 
 use crate::types::UnpackResult;
-use crate::utils::functions::read_null_terminated_string;
+use crate::utils::functions::read_string;
 
 #[derive(Debug, Deserialize)]
 struct MoHeader {
@@ -28,6 +28,7 @@ impl MoHeader {
     fn parse(data: &[u8]) -> Option<Self> {
         let decoded = bincode::deserialize::<MoHeader>(data).ok()?;
         if decoded.magic != 0xde120495 && decoded.magic != 0x950412de {
+            error!("Invalid magic number");
             return None;
         }
 
@@ -61,10 +62,10 @@ impl LangUnpacker {
         })
     }
 
-    pub fn decode(&mut self) -> UnpackResult<()> {
+    pub fn decode(&mut self) -> UnpackResult<&mut Self> {
         if self.decoded {
             warn!("Text data already decoded");
-            return Ok(());
+            return Ok(self);
         }
 
         let mut file = File::open(&mut self.file_path)?;
@@ -83,8 +84,7 @@ impl LangUnpacker {
             let mo_entry = bincode::deserialize::<MoEntry>(&data[index..index + 8])?;
             debug!("{:?}", mo_entry);
             // the string can actually be empty
-            let key_string = read_null_terminated_string(&data, mo_entry.offset as usize)
-                .unwrap_or(String::from(""));
+            let key_string = read_string(&data, mo_entry.offset as usize).unwrap_or_default();
             // some string has null terminator in the middle so it is shorter than the expected length
             // we allow it here because because the actual string seems to be duplicated twice or more
             if key_string.len() > mo_entry.length as usize {
@@ -98,8 +98,7 @@ impl LangUnpacker {
             let index = (entry * 8 + value_offset) as usize;
             let mo_entry = bincode::deserialize::<MoEntry>(&data[index..index + 8])?;
             debug!("{:?}", mo_entry);
-            let value_string = read_null_terminated_string(&data, mo_entry.offset as usize)
-                .unwrap_or(String::from(""));
+            let value_string = read_string(&data, mo_entry.offset as usize).unwrap_or_default();
             if value_string.len() > mo_entry.length as usize {
                 panic!(
                     "Value string {} is longer than length {}",
@@ -111,10 +110,11 @@ impl LangUnpacker {
         }
 
         self.decoded = true;
-        Ok(())
+        info!("Decoded {} strings", text_data.len());
+        Ok(self)
     }
 
-    pub fn write_to_file(&self, file_name: String, dest: String) -> UnpackResult<()> {
+    pub fn write_to_file(&self, file_name: &str, dest: &str) -> UnpackResult<()> {
         if !self.decoded {
             return Err(Box::from(
                 "Text data is not decoded yet, call decode() before writing",
@@ -126,6 +126,7 @@ impl LangUnpacker {
         // encode it to json
         let json = serde_json::to_string(&self.text_data)?;
         file.write_all(json.as_bytes())?;
+        info!("Text data written to {}/{}", dest, file_name);
         Ok(())
     }
 }

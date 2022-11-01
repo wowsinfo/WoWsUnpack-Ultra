@@ -31,17 +31,17 @@ impl GameServer {
 }
 
 pub struct GameDirectory {
-    game_directory_info: HashMap<GameServer, String>,
+    directory: HashMap<GameServer, String>,
 }
 
 impl GameDirectory {
     pub fn new() -> Self {
         Self {
-            game_directory_info: HashMap::new(),
+            directory: HashMap::new(),
         }
     }
 
-    pub fn locate(&mut self) {
+    pub fn locate(&mut self) -> &Self {
         for server in GameServer::values() {
             let current_user = RegKey::predef(HKEY_CURRENT_USER);
             let wows = current_user.open_subkey(server.get_registry_key());
@@ -65,26 +65,30 @@ impl GameDirectory {
 
             // make sure the path is valid
             if Path::new(&path).exists() {
-                self.game_directory_info.insert(server, path.to_string());
+                self.directory.insert(server, path.to_string());
             }
         }
+
+        self
     }
 
-    pub fn info(&self) {
-        let count = self.game_directory_info.len();
+    pub fn info(&self) -> &Self {
+        let count = self.directory.len();
         if count == 0 {
             println!("No game directory found.");
-            return;
+            return self;
         }
 
         println!("Found {} game directory:", count);
-        for (server, path) in &self.game_directory_info {
+        for (server, path) in &self.directory {
             println!("{:?}: {}", server, path);
         }
+
+        self
     }
 
     pub fn get_game_directory(&self, server: GameServer) -> Option<&String> {
-        self.game_directory_info.get(&server)
+        self.directory.get(&server)
     }
 }
 
