@@ -581,11 +581,11 @@ impl GameUnpacker {
             decompressor.read(&mut decompressed_data)?;
 
             if decompressed_data.len() != file_uncompressed_size {
-                panic!(
+                return Err(Box::from(format!(
                     "Decompressed size ({}) does not match expected size ({})",
                     decompressed_data.len(),
                     file_uncompressed_size
-                );
+                )));
             }
             return write_file_data(file_path, &decompressed_data);
         }

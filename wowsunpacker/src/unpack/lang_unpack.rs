@@ -7,7 +7,7 @@ use std::{
     path::Path,
 };
 
-use log::{debug, info, warn, error};
+use log::{debug, error, info, warn};
 use serde::Deserialize;
 
 use crate::types::UnpackResult;
@@ -88,10 +88,10 @@ impl LangUnpacker {
             // some string has null terminator in the middle so it is shorter than the expected length
             // we allow it here because because the actual string seems to be duplicated twice or more
             if key_string.len() > mo_entry.length as usize {
-                panic!(
+                return Err(Box::from(format!(
                     "Key string {} is longer than length {}",
                     key_string, mo_entry.length
-                );
+                )));
             }
 
             // get the translation value
@@ -100,10 +100,10 @@ impl LangUnpacker {
             debug!("{:?}", mo_entry);
             let value_string = read_string(&data, mo_entry.offset as usize).unwrap_or_default();
             if value_string.len() > mo_entry.length as usize {
-                panic!(
+                return Err(Box::from(format!(
                     "Value string {} is longer than length {}",
                     value_string, mo_entry.length
-                );
+                )));
             }
 
             text_data.insert(key_string, value_string);
