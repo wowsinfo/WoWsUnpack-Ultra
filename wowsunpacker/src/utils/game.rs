@@ -28,6 +28,15 @@ impl GameServer {
             }
         }
     }
+
+    fn from(value: i32) -> Option<GameServer> {
+        match value {
+            0 => Some(GameServer::WW),
+            1 => Some(GameServer::CN),
+            2 => Some(GameServer::PT),
+            _ => None,
+        }
+    }
 }
 
 pub struct GameDirectory {
@@ -87,8 +96,8 @@ impl GameDirectory {
         self
     }
 
-    pub fn get_game_directory(&self, server: GameServer) -> Option<&String> {
-        self.directory.get(&server)
+    pub fn get_game_directory(&self, server: GameServer) -> Option<String> {
+        Some(self.directory.get(&server)?.to_owned())
     }
 }
 

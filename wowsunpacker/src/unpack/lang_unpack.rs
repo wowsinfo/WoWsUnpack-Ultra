@@ -121,6 +121,12 @@ impl LangUnpacker {
             ));
         }
 
+        // make sure the destination directory exists
+        let dest_path = Path::new(dest);
+        if !dest_path.exists() {
+            std::fs::create_dir_all(dest_path)?;
+        }
+
         let file_path = Path::new(&dest).join(file_name);
         let mut file = File::create(file_path)?;
         // encode it to json

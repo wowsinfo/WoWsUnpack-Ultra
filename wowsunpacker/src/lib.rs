@@ -1,6 +1,7 @@
 extern crate log;
 mod unpack;
 mod utils;
+mod export;
 
 // only export whatever needed here
 pub mod types;
@@ -31,4 +32,8 @@ pub mod unpacker {
 
 pub mod game {
     pub use crate::utils::game::{GameDirectory, GameLanguages, GameServer};
+}
+
+pub mod tool {
+    pub use crate::export::unpack_languages;
 }
