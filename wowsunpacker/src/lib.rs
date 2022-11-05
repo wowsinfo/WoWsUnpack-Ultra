@@ -1,4 +1,3 @@
-extern crate log;
 mod export;
 mod unpack;
 mod utils;
@@ -35,5 +34,5 @@ pub mod game {
 }
 
 pub mod tool {
-    pub use crate::export::{unpack_game_data, unpack_languages, unpack_game_params};
+    pub use crate::export::{unpack_game_data, unpack_game_params, unpack_languages};
 }
