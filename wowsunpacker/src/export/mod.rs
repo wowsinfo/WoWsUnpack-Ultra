@@ -1,4 +1,4 @@
-mod tools;
 mod c;
+mod tools;
 
-pub use tools::unpack_languages;
+pub use tools::{unpack_game_data, unpack_languages};

@@ -1,4 +1,4 @@
-use log::{error, info};
+use log::info;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
@@ -56,6 +56,26 @@ pub fn unpack_languages(server: GameServer, dest: &str) -> UnpackResult<()> {
             Some(())
         })
         .ok_or("Failed to unpack languages")?;
+
+    Ok(())
+}
+
+pub fn unpack_game_data(server: GameServer, entries: &[&str], dest: &str) -> UnpackResult<()> {
+    let ww_dir = GameDirectory::new()
+        .locate()
+        .get_game_directory(server)
+        .ok_or("Failed to find World of Warships game directory")?;
+
+    let mut unpacker = GameUnpacker::auto(&ww_dir)?;
+    unpacker.build_directory_tree()?;
+    entries
+        .par_iter()
+        .try_for_each(|entry| {
+            info!("Unpacking: {}", entry);
+            unpacker.extract_exact(entry, dest).ok()?;
+            Some(())
+        })
+        .ok_or("Failed to unpack game data")?;
 
     Ok(())
 }

@@ -35,5 +35,5 @@ pub mod game {
 }
 
 pub mod tool {
-    pub use crate::export::unpack_languages;
+    pub use crate::export::{unpack_languages, unpack_game_data};
 }

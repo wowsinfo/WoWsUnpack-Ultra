@@ -84,13 +84,13 @@ impl GameDirectory {
     pub fn info(&self) -> &Self {
         let count = self.directory.len();
         if count == 0 {
-            println!("No game directory found.");
+            warn!("No game directory found.");
             return self;
         }
 
-        println!("Found {} game directory:", count);
+        info!("Found {} game directory:", count);
         for (server, path) in &self.directory {
-            println!("{:?}: {}", server, path);
+            info!("{:?}: {}", server, path);
         }
 
         self

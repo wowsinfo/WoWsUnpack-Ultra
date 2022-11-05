@@ -1,3 +1,5 @@
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+
 use crate::types::{UnpackError, UnpackResult};
 use crate::utils::functions::{read_string, write_file_data};
 use crate::utils::game::GameLanguages;
@@ -556,7 +558,7 @@ impl GameUnpacker {
         let out_dir = out_dir.parent().ok_or("Failed to get parent dir")?;
         if !out_dir.exists() {
             std::fs::create_dir_all(out_dir)?;
-            println!("Created directory: {}", out_dir.display());
+            info!("Created directory: {}", out_dir.display());
         }
         info!("Extracting file: {}", file_record.path);
 
@@ -570,7 +572,7 @@ impl GameUnpacker {
         let file_path = Path::new(dest).join(&file_record.path);
         let file_path = file_path.to_str().ok_or("Failed to convert path to str")?;
         let file_uncompressed_size = file_record.uncompressed_size as usize;
-        println!(
+        info!(
             "Unpacking file: {} ({}/{})",
             file_path, file_size, file_uncompressed_size
         );
