@@ -1,5 +1,3 @@
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
-
 use crate::types::{UnpackError, UnpackResult};
 use crate::utils::functions::{read_string, write_file_data};
 use crate::utils::game::GameLanguages;
