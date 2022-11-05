@@ -17,6 +17,7 @@ regex = "1.6.0"
 winreg = "0.10.1"
 libloading = "0.7.3"
 rayon = "1.5.3"
+libc = "0.2.137"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

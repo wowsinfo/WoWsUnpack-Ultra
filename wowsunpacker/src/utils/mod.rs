@@ -12,7 +12,7 @@ mod tests {
     fn test_game_directory() {
         let mut game_dir = GameDirectory::new();
         game_dir.locate().info();
-        assert!(game_dir.get_game_directory(GameServer::WW).is_some());
+        assert!(game_dir.get_game_directory(&GameServer::WW).is_some());
     }
 
     #[test]

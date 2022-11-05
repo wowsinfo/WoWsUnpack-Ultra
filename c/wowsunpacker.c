@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <Windows.h>
+#include "wowsunpacker.h"
 
-extern int dummy();
+extern char* get_game_directory(int);
 
 int main() {
     printf("Test\n");
-    int number = dummy();
-    printf("Hello, World!, %d\n", number);
+    char* path = get_game_directory(GAME_SERVER_WW);
+    printf("Hello, World!, %s\n", path);
+    free(path);
     return 0;
 }

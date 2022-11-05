@@ -10,7 +10,7 @@ use crate::{
 pub fn unpack_languages(server: GameServer, dest: &str) -> UnpackResult<()> {
     let ww_dir = GameDirectory::new()
         .locate()
-        .get_game_directory(server)
+        .get_game_directory(&server)
         .ok_or("Failed to find World of Warships game directory")?;
 
     let unpacker = GameUnpacker::auto(&ww_dir)?;
@@ -35,7 +35,7 @@ pub fn unpack_languages(server: GameServer, dest: &str) -> UnpackResult<()> {
 pub fn unpack_game_data(server: GameServer, entries: &[&str], dest: &str) -> UnpackResult<()> {
     let ww_dir = GameDirectory::new()
         .locate()
-        .get_game_directory(server)
+        .get_game_directory(&server)
         .ok_or("Failed to find World of Warships game directory")?;
 
     let mut unpacker = GameUnpacker::auto(&ww_dir)?;
@@ -55,7 +55,7 @@ pub fn unpack_game_data(server: GameServer, entries: &[&str], dest: &str) -> Unp
 pub fn unpack_game_params(server: GameServer, dest: &str) -> UnpackResult<()> {
     let ww_dir = GameDirectory::new()
         .locate()
-        .get_game_directory(server)
+        .get_game_directory(&server)
         .ok_or("Failed to find World of Warships game directory")?;
 
     let game_params = "content/GameParams.data";

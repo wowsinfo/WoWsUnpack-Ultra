@@ -11,7 +11,7 @@ pub enum GameServer {
 }
 
 impl GameServer {
-    fn values() -> Vec<GameServer> {
+    pub fn values() -> Vec<GameServer> {
         vec![GameServer::WW, GameServer::CN, GameServer::PT]
     }
 
@@ -29,7 +29,7 @@ impl GameServer {
         }
     }
 
-    fn from(value: i32) -> Option<GameServer> {
+    pub fn from(value: i32) -> Option<GameServer> {
         match value {
             0 => Some(GameServer::WW),
             1 => Some(GameServer::CN),
@@ -96,8 +96,8 @@ impl GameDirectory {
         self
     }
 
-    pub fn get_game_directory(&self, server: GameServer) -> Option<String> {
-        Some(self.directory.get(&server)?.to_owned())
+    pub fn get_game_directory(&self, server: &GameServer) -> Option<String> {
+        Some(self.directory.get(server)?.to_owned())
     }
 }
 
