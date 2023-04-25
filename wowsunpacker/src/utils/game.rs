@@ -18,13 +18,13 @@ impl GameServer {
     fn get_registry_key(&self) -> &'static str {
         match self {
             GameServer::WW => {
-                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\WOWS.WW.PRODUCTION"
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\1527964767"
             }
             GameServer::CN => {
                 r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\WOWS.CN.PRODUCTION"
             }
             GameServer::PT => {
-                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\WOWS.PT.PRODUCTION"
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\2376840996"
             }
         }
     }
