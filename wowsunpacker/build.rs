@@ -1,5 +1,9 @@
 // build.rs
-use std::{path::Path, process::Command};
+extern crate cbindgen;
+
+use std::{env, path::Path, process::Command};
+
+use cbindgen::Config;
 
 fn main() {
     // build the visual studio solution with msbuild by using the script
@@ -65,4 +69,13 @@ fn main() {
         std::fs::copy(dll_path.join(dependency), output_path.join(dependency))
             .expect("Failed to copy dependency");
     }
+
+    // generate C header
+    let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    cbindgen::Builder::new()
+        .with_config(Config::from_file("cbindgen.toml").expect("Unable to read cbindgen.toml"))
+        .with_crate(crate_dir)
+        .generate()
+        .expect("Unable to generate bindings")
+        .write_to_file("wowsunpacker.h");
 }

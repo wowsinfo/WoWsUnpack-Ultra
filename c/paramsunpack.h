@@ -4,6 +4,6 @@
 /// Decode GameParams.data to GameParams.json
 /// path - a string pointing to the GameParams.data file
 /// compact - a boolean indicating the format mode
-int cwowsunpack(char*, int);
+int cparamsunpack(char*, int);
 
 #endif

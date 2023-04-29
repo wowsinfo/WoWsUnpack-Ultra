@@ -3,7 +3,12 @@ use log::{info, warn};
 use std::{collections::HashMap, fmt, path::Path};
 use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
-#[derive(Debug, Hash, PartialEq, Eq)]
+/// The number of supported game servers for C interop
+pub const _GAME_SERVER_COUNT: usize = 3;
+
+/// All supported game servers
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+#[repr(C)]
 pub enum GameServer {
     WW, // Global (ASIA, EU, NA, RU)
     CN, // The Chinese server
@@ -15,17 +20,17 @@ impl GameServer {
         vec![GameServer::WW, GameServer::CN, GameServer::PT]
     }
 
+    pub fn iter() -> impl Iterator<Item = &'static GameServer> {
+        [GameServer::WW, GameServer::CN, GameServer::PT].iter()
+    }
+
     fn get_registry_key(&self) -> &'static str {
         match self {
-            GameServer::WW => {
-                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\1527964767"
-            }
+            GameServer::WW => r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\1527964767",
             GameServer::CN => {
                 r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\WOWS.CN.PRODUCTION"
             }
-            GameServer::PT => {
-                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\2376840996"
-            }
+            GameServer::PT => r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\2376840996",
         }
     }
 
@@ -50,8 +55,20 @@ impl GameDirectory {
         }
     }
 
+    pub fn auto() -> Vec<Option<String>> {
+        let mut dir = GameDirectory::new();
+        let dir = dir.locate();
+        if dir.directory.is_empty() {
+            return Vec::new();
+        }
+
+        GameServer::iter()
+            .map(|server| dir.directory.get(&server).cloned())
+            .collect()
+    }
+
     pub fn locate(&mut self) -> &Self {
-        for server in GameServer::values() {
+        for server in GameServer::iter() {
             let current_user = RegKey::predef(HKEY_CURRENT_USER);
             let wows = current_user.open_subkey(server.get_registry_key());
             if wows.is_err() {
@@ -74,7 +91,7 @@ impl GameDirectory {
 
             // make sure the path is valid
             if Path::new(&path).exists() {
-                self.directory.insert(server, path.to_string());
+                self.directory.insert(*server, path);
             }
         }
 
@@ -101,12 +118,10 @@ impl GameDirectory {
     }
 }
 
-///
 /// All supported game languages
-///
-
 #[allow(non_camel_case_types)]
 #[derive(Debug)]
+#[repr(C)]
 pub enum GameLanguages {
     CS,
     DE,

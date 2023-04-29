@@ -1,10 +1,10 @@
-#include "wowsunpack.h"
+#include "paramsunpack.h"
 #include <Windows.h>
 #include <stdio.h>
 
 typedef void (*FUNC)(char*, int);
 
-int cwowsunpack(char* path, int compact) {
+int cparamsunpack(char* path, int compact) {
     // load library
     HMODULE hModule = LoadLibrary("HenryQuan.WoWsUnpack.dll");
     if (hModule == NULL) {
