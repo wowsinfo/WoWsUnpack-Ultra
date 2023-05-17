@@ -42,6 +42,7 @@ typedef enum GameServer {
   GAME_SERVER_WW,
   GAME_SERVER_CN,
   GAME_SERVER_PT,
+  GAME_SERVER_XX,
 } GameServer;
 
 /**

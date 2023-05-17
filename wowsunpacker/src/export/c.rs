@@ -10,12 +10,7 @@ use libc::{c_char, c_int};
  */
 #[no_mangle]
 pub extern "C" fn get_game_directory(server: c_int) -> *const c_char {
-    let server = GameServer::from(server);
-    if server.is_none() {
-        return std::ptr::null();
-    }
-
-    let server = server.unwrap();
+    let server = GameServer::from_number(server);
     let ww_dir = GameDirectory::new().locate().get_game_directory(&server);
     if ww_dir.is_none() {
         return std::ptr::null();

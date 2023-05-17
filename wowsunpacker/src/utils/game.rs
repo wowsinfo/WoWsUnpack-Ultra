@@ -1,5 +1,5 @@
 extern crate winreg;
-use log::{info, warn};
+use log::{error, info, warn};
 use std::{collections::HashMap, fmt, path::Path};
 use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
@@ -13,33 +13,33 @@ pub enum GameServer {
     WW, // Global (ASIA, EU, NA, RU)
     CN, // The Chinese server
     PT, // The Public Test server
+    XX, // Unknown
 }
 
 impl GameServer {
-    pub fn values() -> Vec<GameServer> {
-        vec![GameServer::WW, GameServer::CN, GameServer::PT]
-    }
-
-    pub fn iter() -> impl Iterator<Item = &'static GameServer> {
+    fn iter() -> impl Iterator<Item = &'static GameServer> {
         [GameServer::WW, GameServer::CN, GameServer::PT].iter()
     }
 
-    fn get_registry_key(&self) -> &'static str {
-        match self {
-            GameServer::WW => r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\1527964767",
-            GameServer::CN => {
-                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\WOWS.CN.PRODUCTION"
-            }
-            GameServer::PT => r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\2376840996",
+    fn registry_path() -> &'static str {
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\"
+    }
+
+    pub fn from_string(value: &str) -> GameServer {
+        match value {
+            "WOWS.WW.PRODUCTION" => GameServer::WW,
+            "WOWS.CN.PRODUCTION" => GameServer::CN,
+            "WOWS.PT.PRODUCTION" => GameServer::PT,
+            _ => GameServer::XX,
         }
     }
 
-    pub fn from(value: i32) -> Option<GameServer> {
+    pub fn from_number(value: i32) -> GameServer {
         match value {
-            0 => Some(GameServer::WW),
-            1 => Some(GameServer::CN),
-            2 => Some(GameServer::PT),
-            _ => None,
+            0 => GameServer::WW,
+            1 => GameServer::CN,
+            2 => GameServer::PT,
+            _ => GameServer::XX,
         }
     }
 }
@@ -58,7 +58,8 @@ impl GameDirectory {
     pub fn auto() -> Vec<Option<String>> {
         let mut dir = GameDirectory::new();
         let dir = dir.locate();
-        if dir.directory.is_empty() {
+        let directory = &dir.directory;
+        if directory.is_empty() {
             return Vec::new();
         }
 
@@ -68,32 +69,49 @@ impl GameDirectory {
     }
 
     pub fn locate(&mut self) -> &Self {
-        for server in GameServer::iter() {
-            let current_user = RegKey::predef(HKEY_CURRENT_USER);
-            let wows = current_user.open_subkey(server.get_registry_key());
-            if wows.is_err() {
-                warn!("Failed to open registry key for {:?}", server);
-                continue;
-            }
-
-            let wows = wows.unwrap();
-            let install_location = wows.get_value("InstallLocation");
-            if install_location.is_err() {
-                warn!("Failed to get InstallLocation for {:?}", server);
-                continue;
-            }
-
-            let path: String = install_location.unwrap();
-            info!("Found game directory: {}", path);
-            if path.is_empty() {
-                continue;
-            }
-
-            // make sure the path is valid
-            if Path::new(&path).exists() {
-                self.directory.insert(*server, path);
-            }
+        let current_user = RegKey::predef(HKEY_CURRENT_USER);
+        let uninstall = current_user.open_subkey(GameServer::registry_path());
+        if uninstall.is_err() {
+            error!("Failed to open registry key uninstall");
+            return self;
         }
+
+        // we no longer know the exact key of the Game, so we have to iterate through all of them
+        let uninstall = uninstall.unwrap();
+        uninstall
+            .enum_keys()
+            .map(|key| {
+                let folder = uninstall.open_subkey(key.ok()?).ok()?;
+                let publisher: String = folder.get_value("Publisher").ok()?;
+                // referenced from the group chat
+                if !match publisher.as_str() {
+                    "Wargaming.net" | "Wargaming Group Limited" | "360.cn" | "Lesta Games" => true,
+                    _ => false,
+                } {
+                    return None;
+                }
+
+                let install_location = folder.get_value("InstallLocation").ok()?;
+                // Find out the server
+                let path = Path::new(&install_location).join("game_info.xml");
+                if !path.exists() {
+                    return None;
+                }
+
+                // Read until the line <id>xxx</id>
+                let xml = std::fs::read_to_string(path).ok()?;
+                let id = xml.lines().find(|line| line.contains("<id>"))?;
+                let game_server_string = id.split(|c| c == '<' || c == '>').nth(2)?;
+                log::info!("Found game server: {}", game_server_string);
+
+                let server = GameServer::from_string(game_server_string);
+                Some((server, install_location))
+            })
+            .filter(|x| x.is_some())
+            .for_each(|x| {
+                let (server, path) = x.unwrap();
+                self.directory.insert(server, path);
+            });
 
         self
     }
