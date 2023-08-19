@@ -83,6 +83,6 @@ void free_cstring(const char *ptr);
 /**
  *  * Free a list of C strings allocated by Rust  * @param list: The pointer to free  * @return Nothing
  */
-void free_cstring_list(const char *const *list);
+void free_game_directory_list(const struct GameDirectoryList *ptr);
 
 #endif /* _WOWSUNPACKER_RUST_H_ */

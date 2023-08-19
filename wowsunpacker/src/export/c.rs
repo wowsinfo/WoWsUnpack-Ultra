@@ -108,11 +108,11 @@ pub extern "C" fn unpack_game_data(
  */
 #[no_mangle]
 pub extern "C" fn free_cstring(ptr: *const c_char) {
-    unsafe {
-        if ptr.is_null() {
-            return;
-        }
+    if ptr.is_null() {
+        return;
+    }
 
+    unsafe {
         let _ = CString::from_raw(ptr as *mut c_char);
     }
 }
@@ -123,17 +123,16 @@ pub extern "C" fn free_cstring(ptr: *const c_char) {
  * @return Nothing
  */
 #[no_mangle]
-pub extern "C" fn free_cstring_list(list: *const *const c_char) {
-    if list.is_null() {
+pub extern "C" fn free_game_directory_list(ptr: *const GameDirectoryList) {
+    if ptr.is_null() {
         return;
     }
 
-    // TODO: this needs to be improved, not all lists are 3 items long
-    let list = unsafe { Vec::from_raw_parts(list as *mut *const c_char, 3, 3) };
-    for s in list.iter() {
-        unsafe {
-            let a = CString::from_raw(*s as *mut c_char);
-            println!("{:?}", a)
+    unsafe {
+        let list = Box::from_raw(ptr as *mut GameDirectoryList);
+        let list = std::slice::from_raw_parts_mut(list.list as *mut *mut c_char, list.count as usize);
+        for ptr in list {
+            free_cstring(*ptr);
         }
     }
 }

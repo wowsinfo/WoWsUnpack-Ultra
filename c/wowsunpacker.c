@@ -20,6 +20,8 @@ int main() {
         printf(" Directory: %s\n", directories->list[i]);
     }
 
+    free_game_directory_list(directories);
+
     printf("Unpack game data\n");
     const char* entries[] = {"gui/dogTags/medium/", "gui/4k/",
                              "content/GameParams.data"};
