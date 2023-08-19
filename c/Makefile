@@ -14,7 +14,7 @@ wowsunpacker:
 	move /y "..\wowsunpacker\target\release\wowsunpacker.dll" .
 	$(CC) -o wowsunpacker wowsunpacker.c wowsunpacker.dll
 
-all: move run paramsunpack
+all: move run paramsunpack wowsunpacker
 
 clean:
 	del *.dll *.exe *.json

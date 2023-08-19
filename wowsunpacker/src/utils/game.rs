@@ -21,9 +21,7 @@ impl GameServer {
         [GameServer::WW, GameServer::CN, GameServer::PT].iter()
     }
 
-    fn registry_path() -> &'static str {
-        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\"
-    }
+    const REGISTRY_PATH: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\";
 
     pub fn from_string(value: &str) -> GameServer {
         match value {
@@ -55,7 +53,7 @@ impl GameDirectory {
         }
     }
 
-    pub fn auto() -> Vec<Option<String>> {
+    pub fn auto() -> Vec<String> {
         let mut dir = GameDirectory::new();
         let dir = dir.locate();
         let directory = &dir.directory;
@@ -64,13 +62,13 @@ impl GameDirectory {
         }
 
         GameServer::iter()
-            .map(|server| dir.directory.get(&server).cloned())
+            .flat_map(|server| dir.directory.get(&server).cloned())
             .collect()
     }
 
     pub fn locate(&mut self) -> &Self {
         let current_user = RegKey::predef(HKEY_CURRENT_USER);
-        let uninstall = current_user.open_subkey(GameServer::registry_path());
+        let uninstall = current_user.open_subkey(GameServer::REGISTRY_PATH);
         if uninstall.is_err() {
             error!("Failed to open registry key uninstall");
             return self;

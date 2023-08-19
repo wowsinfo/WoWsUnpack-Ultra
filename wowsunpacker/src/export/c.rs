@@ -1,7 +1,27 @@
 use std::ffi::CString;
 
-use crate::game::{GameDirectory, GameServer};
+use crate::{
+    game::{GameDirectory, GameServer},
+    tool::unpack_game_data as unpack_game_data_impl,
+    types::UnpackResult,
+};
 use libc::{c_char, c_int};
+
+/// C Structs
+
+#[repr(C)]
+pub struct GameDirectoryList {
+    pub list: *const *const c_char,
+    pub count: c_int,
+}
+
+#[repr(C)]
+pub struct GameServerList {
+    pub list: *const c_int,
+    pub count: c_int,
+}
+
+/// Game Directory
 
 /**
  * Get the game directory for a given server
@@ -18,7 +38,12 @@ pub extern "C" fn get_game_directory(server: c_int) -> *const c_char {
 
     // return C string
     let ww_dir = ww_dir.unwrap();
-    CString::new(ww_dir).unwrap().into_raw()
+    let str = CString::new(ww_dir);
+    if str.is_err() {
+        return std::ptr::null();
+    }
+
+    str.unwrap().into_raw()
 }
 
 /**
@@ -26,24 +51,55 @@ pub extern "C" fn get_game_directory(server: c_int) -> *const c_char {
  * @return A list of C strings containing the game directories, or NULL if none are found
  */
 #[no_mangle]
-pub extern "C" fn get_all_game_directories() -> *const *const c_char {
+pub extern "C" fn get_all_game_directories() -> *const GameDirectoryList {
     let dirs = GameDirectory::auto();
     if dirs.is_empty() {
         return std::ptr::null();
     }
 
+    let count = dirs.len() as c_int;
     let mut list = Vec::new();
     for dir in dirs {
-        if dir.is_none() {
-            list.push(CString::new("").unwrap().into_raw());
-            continue;
+        let dir = CString::new(dir);
+        if dir.is_err() {
+            return std::ptr::null();
         }
-
-        let dir = dir.unwrap();
-        list.push(CString::new(dir).unwrap().into_raw());
+        list.push(dir.unwrap().into_raw());
     }
-    Box::into_raw(list.into_boxed_slice()) as *const *const c_char
+    
+    let list = list.as_ptr() as *const *const c_char;
+    let list = Box::new(GameDirectoryList { list, count });
+    Box::into_raw(list)
 }
+
+/// Game Unpacker
+
+#[no_mangle]
+pub extern "C" fn unpack_game_data(
+    server: c_int,
+    entries: *const *const c_char,
+    size: c_int,
+    dest: *const c_char,
+) -> c_int {
+    let server = GameServer::from_number(server);
+    let entries = unsafe { convert_cstring_list(entries, size) };
+    if entries.is_err() {
+        return 1;
+    }
+
+    let entries = entries.unwrap();
+    let entries: Vec<&str> = entries.iter().map(|s| s.as_str()).collect();
+    let dest = unsafe { convert_cstring(dest) };
+    if dest.is_err() {
+        return 1;
+    }
+
+    let dest = dest.unwrap();
+    let result = unpack_game_data_impl(server, entries.as_slice(), dest.as_str());
+    return  result.is_err() as c_int;;
+}
+
+/// Free
 
 /**
  * Free a C string allocated by Rust
@@ -72,7 +128,7 @@ pub extern "C" fn free_cstring_list(list: *const *const c_char) {
         return;
     }
 
-// TODO: this needs to be improved, not all lists are 3 items long
+    // TODO: this needs to be improved, not all lists are 3 items long
     let list = unsafe { Vec::from_raw_parts(list as *mut *const c_char, 3, 3) };
     for s in list.iter() {
         unsafe {
@@ -80,4 +136,35 @@ pub extern "C" fn free_cstring_list(list: *const *const c_char) {
             println!("{:?}", a)
         }
     }
+}
+
+/// Helper Functions
+
+unsafe fn convert_cstring_list(
+    list: *const *const c_char,
+    size: c_int,
+) -> UnpackResult<Vec<String>> {
+    if list.is_null() {
+        return Err("Null pointer".into());
+    }
+
+    if size <= 0 {
+        return Err("Invalid size".into());
+    }
+
+    let mut result = Vec::new();
+    for i in 0..size {
+        let str = convert_cstring(*list.offset(i as isize))?;
+        result.push(str);
+    }
+    Ok(result)
+}
+
+unsafe fn convert_cstring(ptr: *const c_char) -> UnpackResult<String> {
+    if ptr.is_null() {
+        return Err("Null pointer".into());
+    }
+
+    let s = CString::from_raw(ptr as *mut c_char);
+    Ok(s.into_string()?)
 }

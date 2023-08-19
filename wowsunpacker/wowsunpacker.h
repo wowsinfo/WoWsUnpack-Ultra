@@ -46,6 +46,20 @@ typedef enum GameServer {
 } GameServer;
 
 /**
+ * C Structs
+ */
+typedef struct GameDirectoryList {
+  const char *const *list;
+  int count;
+} GameDirectoryList;
+
+typedef struct GameServerList {
+  const int *list;
+  int count;
+} GameServerList;
+
+/**
+ * Game Directory
  *  * Get the game directory for a given server  * @param server: The server to get the game directory for  * @return A C string containing the game directory, or NULL if the server is not found
  */
 const char *get_game_directory(int server);
@@ -53,9 +67,15 @@ const char *get_game_directory(int server);
 /**
  *  * Get all available game directories  * @return A list of C strings containing the game directories, or NULL if none are found
  */
-const char *const *get_all_game_directories(void);
+const struct GameDirectoryList *get_all_game_directories(void);
 
 /**
+ * Game Unpacker
+ */
+int unpack_game_data(int server, const char *const *entries, int size, const char *dest);
+
+/**
+ * Free
  *  * Free a C string allocated by Rust  * @param ptr: The pointer to free  * @return Nothing
  */
 void free_cstring(const char *ptr);

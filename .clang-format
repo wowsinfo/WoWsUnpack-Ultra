@@ -2,7 +2,7 @@
 # Run manually to reformat a file:
 # clang-format -i --style=file <file>
 Language: Cpp
-BasedOnStyle: Chromium
+BasedOnStyle: Google
 SortIncludes: true
 
 # 4 tabs by default

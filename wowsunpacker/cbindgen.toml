@@ -18,6 +18,8 @@ sys_includes = []
 # Add structs here to export them, cbindgen doesn't export structs by default somehow
 include = [
     "GameServer",
+    "GameServerList",
+    "GameDirectoryList",
     "GameLanguages",
 ]
 
