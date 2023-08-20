@@ -3,9 +3,6 @@ use log::{error, info, warn};
 use std::{collections::HashMap, fmt, path::Path};
 use winreg::{enums::HKEY_CURRENT_USER, RegKey};
 
-/// The number of supported game servers for C interop
-pub const _GAME_SERVER_COUNT: usize = 3;
-
 /// All supported game servers
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 #[repr(C)]
@@ -53,7 +50,11 @@ impl GameDirectory {
         }
     }
 
-    pub fn auto() -> Vec<String> {
+    /**
+     * Get all available game directories path
+     * @return A vector containing all available game directories path
+     */
+    pub fn available_path() -> Vec<String> {
         let mut dir = GameDirectory::new();
         let dir = dir.locate();
         let directory = &dir.directory;
@@ -63,6 +64,24 @@ impl GameDirectory {
 
         GameServer::iter()
             .flat_map(|server| dir.directory.get(&server).cloned())
+            .collect()
+    }
+
+    /**
+     * Get all available game servers, similar to `available_path` but returns [GameServer] instead of [String]
+     * @return A vector containing all available game servers
+     */
+    pub fn available_server() -> Vec<GameServer> {
+        let mut dir = GameDirectory::new();
+        let dir = dir.locate();
+        let directory = &dir.directory;
+        if directory.is_empty() {
+            return Vec::new();
+        }
+
+        GameServer::iter()
+            .filter(|server| dir.directory.contains_key(server))
+            .cloned()
             .collect()
     }
 
@@ -78,7 +97,7 @@ impl GameDirectory {
         let uninstall = uninstall.unwrap();
         uninstall
             .enum_keys()
-            .map(|key| {
+            .flat_map(|key| {
                 let folder = uninstall.open_subkey(key.ok()?).ok()?;
                 let publisher: String = folder.get_value("Publisher").ok()?;
                 // referenced from the group chat
@@ -105,9 +124,8 @@ impl GameDirectory {
                 let server = GameServer::from_string(game_server_string);
                 Some((server, install_location))
             })
-            .filter(|x| x.is_some())
             .for_each(|x| {
-                let (server, path) = x.unwrap();
+                let (server, path) = x;
                 self.directory.insert(server, path);
             });
 

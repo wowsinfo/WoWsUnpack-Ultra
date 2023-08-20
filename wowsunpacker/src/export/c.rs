@@ -21,7 +21,9 @@ pub struct GameServerList {
     pub count: c_int,
 }
 
-/// Game Directory
+/**
+ * Game Directory & Game Server
+ */
 
 /**
  * Get the game directory for a given server
@@ -48,11 +50,11 @@ pub extern "C" fn get_game_directory(server: c_int) -> *const c_char {
 
 /**
  * Get all available game directories
- * @return A list of C strings containing the game directories, or NULL if none are found
+ * @return A [GameDirectoryList] containing all available game directories
  */
 #[no_mangle]
 pub extern "C" fn get_all_game_directories() -> *const GameDirectoryList {
-    let dirs = GameDirectory::auto();
+    let dirs = GameDirectory::available_path();
     if dirs.is_empty() {
         return std::ptr::null();
     }
@@ -66,14 +68,81 @@ pub extern "C" fn get_all_game_directories() -> *const GameDirectoryList {
         }
         list.push(dir.unwrap().into_raw());
     }
-    
+
     let list = list.as_ptr() as *const *const c_char;
     let list = Box::new(GameDirectoryList { list, count });
     Box::into_raw(list)
 }
 
-/// Game Unpacker
+/**
+ * Get the first available game directory
+ * @return The first available game directory, or NULL if none are available
+ */
+#[no_mangle]
+pub extern "C" fn get_first_game_directory() -> *const c_char {
+    let dirs = GameDirectory::available_path();
+    if dirs.is_empty() {
+        return std::ptr::null();
+    }
 
+    // return C string
+    let dir = dirs[0].clone();
+    let str = CString::new(dir);
+    if str.is_err() {
+        return std::ptr::null();
+    }
+
+    str.unwrap().into_raw()
+}
+
+/**
+ * Get all available game servers
+ * @return A [GameServerList] containing all available game servers
+ */
+#[no_mangle]
+pub extern "C" fn get_all_game_servers() -> *const GameServerList {
+    let servers = GameDirectory::available_server();
+    if servers.is_empty() {
+        return std::ptr::null();
+    }
+
+    let count = servers.len() as c_int;
+    let mut list = Vec::new();
+    for server in servers {
+        list.push(server as c_int);
+    }
+
+    let list = list.as_ptr() as *const c_int;
+    let list = Box::new(GameServerList { list, count });
+    Box::into_raw(list)
+}
+
+/**
+ * Get the first available game server
+ * @return The first available game server, or -1 if none are available
+ */
+#[no_mangle]
+pub extern "C" fn get_first_game_server() -> c_int {
+    let servers = GameDirectory::available_server();
+    if servers.is_empty() {
+        return -1;
+    }
+
+    servers[0] as c_int
+}
+
+/**
+ * Game Unpacker
+ */
+
+/**
+ * Extract a list of entries/paths from the game data
+ * @param server: The game server id
+ * @param entries: The list of entries/paths to extract
+ * @param size: The size of the entries list, Rust doesn't know the size otherwise
+ * @param dest: The destination directory to extract to
+ * @return 0 if successful, 1 if not
+ */
 #[no_mangle]
 pub extern "C" fn unpack_game_data(
     server: c_int,
@@ -96,48 +165,62 @@ pub extern "C" fn unpack_game_data(
 
     let dest = dest.unwrap();
     let result = unpack_game_data_impl(server, entries.as_slice(), dest.as_str());
-    return  result.is_err() as c_int;;
+    return result.is_err() as c_int;
 }
 
 /// Free
 
 /**
- * Free a C string allocated by Rust
+ * Free a C string allocated by Rust [CString]
  * @param ptr: The pointer to free
  * @return Nothing
  */
 #[no_mangle]
-pub extern "C" fn free_cstring(ptr: *const c_char) {
+pub unsafe extern "C" fn free_cstring(ptr: *const c_char) {
     if ptr.is_null() {
         return;
     }
 
-    unsafe {
-        let _ = CString::from_raw(ptr as *mut c_char);
+    // freed when it goes out of scope
+    let _ = CString::from_raw(ptr as *mut c_char);
+}
+
+/**
+ * Free a [GameDirectoryList] allocated by Rust
+ * @param ptr: The pointer to free
+ * @return Nothing
+ */
+#[no_mangle]
+pub unsafe extern "C" fn free_game_directory_list(ptr: *const GameDirectoryList) {
+    if ptr.is_null() {
+        return;
+    }
+
+    let list = Box::from_raw(ptr as *mut GameDirectoryList);
+    let list = std::slice::from_raw_parts(list.list, list.count as usize);
+    for ptr in list {
+        free_cstring(*ptr);
     }
 }
 
 /**
- * Free a list of C strings allocated by Rust
- * @param list: The pointer to free
+ * Free a [GameServerList] allocated by Rust
+ * @param ptr: The pointer to free
  * @return Nothing
  */
 #[no_mangle]
-pub extern "C" fn free_game_directory_list(ptr: *const GameDirectoryList) {
+pub unsafe extern "C" fn free_game_server_list(ptr: *const GameServerList) {
     if ptr.is_null() {
         return;
     }
 
-    unsafe {
-        let list = Box::from_raw(ptr as *mut GameDirectoryList);
-        let list = std::slice::from_raw_parts_mut(list.list as *mut *mut c_char, list.count as usize);
-        for ptr in list {
-            free_cstring(*ptr);
-        }
-    }
+    let list = Box::from_raw(ptr as *mut GameServerList);
+    let _ = std::slice::from_raw_parts(list.list, list.count as usize);
 }
 
-/// Helper Functions
+/**
+ * Helper Functions
+ */
 
 unsafe fn convert_cstring_list(
     list: *const *const c_char,
