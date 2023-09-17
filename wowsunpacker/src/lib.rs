@@ -29,6 +29,10 @@ pub mod unpacker {
     pub use crate::unpack::params_unpack::ParamsUnpacker;
 }
 
+pub mod browser {
+    pub use crate::unpack::directory_browser::DirectoryBrowser;
+}
+
 pub mod game {
     pub use crate::utils::game::{GameDirectory, GameLanguages, GameServer};
 }

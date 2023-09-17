@@ -349,6 +349,32 @@ impl DirectoryTree {
             TreeNode::create_with(file_record.clone()),
         );
     }
+
+    /// Go to the node with the given position
+    /// # Arguments
+    /// * `position` - The position to go to in a list
+    /// # Returns
+    /// * The node if it exists
+    /// * None if it doesn't exist
+    fn goto(&self, position: &Vec<String>) -> Option<&TreeNode> {
+        if position.is_empty() {
+            return Some(&self.root);
+        }
+
+        let mut current = &self.root;
+        for part in position {
+            if part.is_empty() {
+                return None;
+            }
+
+            if let Some(node) = current.nodes.get(part) {
+                current = node;
+            } else {
+                return None;
+            }
+        }
+        Some(current)
+    }
 }
 
 pub struct GameUnpacker {
