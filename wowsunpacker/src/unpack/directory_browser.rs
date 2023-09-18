@@ -30,7 +30,13 @@ impl DirectoryBrowser<'_> {
     }
 
     pub fn list_files(&self) -> Vec<String> {
-        return Vec::new();
+        let node = self.unpacker.directory_tree.goto(&self.position);
+        if node.is_none() {
+            return Vec::new();
+        }
+
+        let node = node.unwrap();
+        node.files().map(|f| f.clone()).collect()
     }
 
     pub fn list_directories(&self) -> Vec<String> {

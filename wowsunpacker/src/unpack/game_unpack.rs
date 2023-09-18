@@ -1,6 +1,7 @@
 use crate::types::{UnpackError, UnpackResult};
 use crate::utils::functions::{read_string, write_file_data};
 use crate::utils::game::GameLanguages;
+use bincode::de;
 use flate2::bufread::DeflateDecoder;
 use log::{debug, error, info, warn};
 use regex::Regex;
@@ -99,7 +100,7 @@ impl Node {
 
 const FILE_RECORD_SIZE: u32 = 48;
 #[derive(Debug, Clone)]
-struct FileRecord {
+pub struct FileRecord {
     pkg_name: String,
     path: String,
     id: u64,
@@ -269,11 +270,12 @@ impl IdxFile {
     }
 }
 
-struct TreeNode {
+pub struct TreeNode {
     nodes: HashMap<String, TreeNode>,
     file: Option<FileRecord>,
 }
 
+const MAX_DEPTH: i32 = 3;
 impl TreeNode {
     fn new() -> Self {
         Self {
@@ -288,14 +290,41 @@ impl TreeNode {
             file: Some(file),
         }
     }
+
+    pub fn print_children(&self, depth: i32) {
+        if depth <= 0 || depth > MAX_DEPTH {
+            return;
+        }
+
+        for (name, node) in &self.nodes {
+            let indent = " ".repeat(((MAX_DEPTH - depth) * 2) as usize);
+            if node.file.is_some() {
+                println!("{}{}*", indent, name);
+            } else {
+                println!("{}{}", indent, name);
+                node.print_children(depth - 1);
+            }
+        }
+    }
+
+    pub fn files(&self) -> impl Iterator<Item = &String> {
+        self.nodes
+            .iter()
+            .filter(|(_, node)| node.file.is_some())
+            .map(|(name, _)| name)
+    }
+
+    pub fn directories(&self) -> Vec<&TreeNode> {
+        Vec::new()
+    }
 }
 
-struct DirectoryTree {
-    root: TreeNode,
+pub struct DirectoryTree {
+    pub root: TreeNode,
 }
 
 impl DirectoryTree {
-    fn find(&self, path: &str) -> Option<&TreeNode> {
+    pub fn find(&self, path: &str) -> Option<&TreeNode> {
         let mut current = &self.root;
         for part in path.split("/") {
             if part.is_empty() {
@@ -356,7 +385,7 @@ impl DirectoryTree {
     /// # Returns
     /// * The node if it exists
     /// * None if it doesn't exist
-    fn goto(&self, position: &Vec<String>) -> Option<&TreeNode> {
+    pub fn goto(&self, position: &Vec<String>) -> Option<&TreeNode> {
         if position.is_empty() {
             return Some(&self.root);
         }
@@ -378,7 +407,7 @@ impl DirectoryTree {
 }
 
 pub struct GameUnpacker {
-    directory_tree: DirectoryTree,
+    pub directory_tree: DirectoryTree,
     pkg_path: String,
     idx_path: String,
     text_path: String,
