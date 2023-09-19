@@ -6,7 +6,8 @@ fn main() -> UnpackResult<()> {
     setup_default_logger();
     unpack_game_data(
         GameServer::WW,
-        &["gui/dogTags/medium/", "gui/4k/", "content/GameParams.data"],
+        // &["gui/dogTags/medium/", "gui/4k/", "content/GameParams.data"],
+        &["gui/tokens"],
         "output",
     )?;
     Ok(())

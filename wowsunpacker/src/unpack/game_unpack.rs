@@ -1,7 +1,6 @@
 use crate::types::{UnpackError, UnpackResult};
 use crate::utils::functions::{read_string, write_file_data};
 use crate::utils::game::GameLanguages;
-use bincode::de;
 use flate2::bufread::DeflateDecoder;
 use log::{debug, error, info, warn};
 use regex::Regex;
@@ -291,6 +290,34 @@ impl TreeNode {
         }
     }
 
+    // TODO: this is still not accurate, test `gui/tokens`, it is a directory with a single in it
+    pub fn is_file(&self) -> bool {
+        match self.file {
+            Some(_) => true, // there is a record, 100% file
+            None => {
+                match self.nodes.len() {
+                    1 => self.nodes.values().next().unwrap().is_file(), // make sure the only child is a file
+                    _ => false, // more than 1 child, 100% directory
+                }
+            }
+        }
+    }
+
+    fn items(&self, file: bool) -> impl Iterator<Item = &String> {
+        self.nodes
+            .iter()
+            .filter(move |(_, node)| node.is_file() == file)
+            .map(|(name, _)| name)
+    }
+
+    pub fn files(&self) -> impl Iterator<Item = &String> {
+        self.items(true)
+    }
+
+    pub fn directories(&self) -> impl Iterator<Item = &String> {
+        self.items(false)
+    }
+
     pub fn print_children(&self, depth: i32) {
         if depth <= 0 || depth > MAX_DEPTH {
             return;
@@ -298,24 +325,13 @@ impl TreeNode {
 
         for (name, node) in &self.nodes {
             let indent = " ".repeat(((MAX_DEPTH - depth) * 2) as usize);
-            if node.file.is_some() {
-                println!("{}{}*", indent, name);
-            } else {
+            if node.is_file() {
                 println!("{}{}", indent, name);
+            } else {
+                println!("{}{}/", indent, name);
                 node.print_children(depth - 1);
             }
         }
-    }
-
-    pub fn files(&self) -> impl Iterator<Item = &String> {
-        self.nodes
-            .iter()
-            .filter(|(_, node)| node.file.is_some())
-            .map(|(name, _)| name)
-    }
-
-    pub fn directories(&self) -> Vec<&TreeNode> {
-        Vec::new()
     }
 }
 

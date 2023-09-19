@@ -1,11 +1,14 @@
-use log::info;
 use wowsunpacker::{
-    browser::DirectoryBrowser, logger::setup_default_logger, types::UnpackResult,
-    unpacker::GameUnpacker,
+    browser::DirectoryBrowser, logger::setup_logger, types::UnpackResult, unpacker::GameUnpacker,
 };
 
+fn print_browser_info(browser: &DirectoryBrowser) {
+    println!("Files: {:?}", browser.file_list());
+    println!("Directories: {:?}", browser.directory_list());
+}
+
 fn main() -> UnpackResult<()> {
-    setup_default_logger();
+    setup_logger("off", "off");
 
     let folder_path = "gui";
 
@@ -16,20 +19,23 @@ fn main() -> UnpackResult<()> {
         .directory_tree
         .find(folder_path)
         .expect(format!("{} not found", folder_path).as_str())
-        .print_children(1);
-    browser.goto("gui");
-    browser.goto("4k");
-    info!("Files: {:?}", browser.list_files());
-    info!("Directories: {:?}", browser.list_directories());
+        .print_children(2);
+    browser.navigate_to("gui");
+    browser.navigate_to("4k");
+    print_browser_info(&browser);
     browser.unpack_file("test4k.png");
     browser.go_back();
-    browser.goto("bg");
+    browser.navigate_to("bg");
 
     // let's try invalid path
     browser.reset();
-    browser.goto("gui");
-    browser.goto("fghobqiua");
-    info!("Files: {:?}", browser.list_files());
-    info!("Directories: {:?}", browser.list_directories());
+    browser.navigate_to("gui");
+    browser.navigate_to("fghobqiua");
+    print_browser_info(&browser);
+
+    // try a folder with both files and directories
+    browser.go_back();
+    print_browser_info(&browser);
+
     Ok(())
 }

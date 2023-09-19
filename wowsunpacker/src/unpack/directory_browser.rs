@@ -1,5 +1,7 @@
 use crate::unpacker::GameUnpacker;
 
+use super::game_unpack::TreeNode;
+
 pub struct DirectoryBrowser<'a> {
     // a reference of GameUnpacker
     unpacker: &'a GameUnpacker,
@@ -14,7 +16,7 @@ impl DirectoryBrowser<'_> {
         };
     }
 
-    pub fn goto(&mut self, path: &str) -> &Self {
+    pub fn navigate_to(&mut self, path: &str) -> &Self {
         self.position.push(path.to_string());
         self
     }
@@ -29,18 +31,22 @@ impl DirectoryBrowser<'_> {
         self
     }
 
-    pub fn list_files(&self) -> Vec<String> {
-        let node = self.unpacker.directory_tree.goto(&self.position);
-        if node.is_none() {
-            return Vec::new();
-        }
-
-        let node = node.unwrap();
-        node.files().map(|f| f.clone()).collect()
+    fn current_node(&self) -> Option<&TreeNode> {
+        return self.unpacker.directory_tree.goto(&self.position);
     }
 
-    pub fn list_directories(&self) -> Vec<String> {
-        return Vec::new();
+    pub fn file_list(&self) -> Vec<&String> {
+        match self.current_node() {
+            None => Vec::new(),
+            Some(node) => node.files().collect(),
+        }
+    }
+
+    pub fn directory_list(&self) -> Vec<&String> {
+        match self.current_node() {
+            None => Vec::new(),
+            Some(node) => node.directories().collect(),
+        }
     }
 
     /// Unpack the file based on the current position
@@ -48,8 +54,18 @@ impl DirectoryBrowser<'_> {
     /// * `path` - The path to extract, separator is always `/`
     /// # Returns
     /// * The unpacked file as a byte array
-    pub fn unpack_file(&self, path: &str) -> Vec<u8> {
-        return Vec::new();
+    pub fn unpack_file(&self, path: &str) {
+        match self.current_node() {
+            Some(node) => {
+                // TODO: 
+                // ignore the parameter and unpack the current file
+                if node.is_file() {
+                    // self.unpacker.extract_exact(node_name, dest)
+                } else {
+                }
+            }
+            None => return,
+        }
     }
 
     /// Split the path into a vector of strings
