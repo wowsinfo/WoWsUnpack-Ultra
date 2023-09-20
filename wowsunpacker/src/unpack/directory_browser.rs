@@ -1,4 +1,4 @@
-use crate::unpacker::GameUnpacker;
+use crate::{types::UnpackResult, unpacker::GameUnpacker};
 
 use super::game_unpack::TreeNode;
 
@@ -51,25 +51,25 @@ impl DirectoryBrowser<'_> {
 
     /// Unpack the file based on the current position
     /// # Arguments
-    /// * `path` - The path to extract, separator is always `/`
+    /// * `path` - The path to extract, use "/" as the separator, you can unpack a file or a directory, don't start the path with "/"
     /// # Returns
     /// * The unpacked file as a byte array
-    pub fn unpack_file(&self, path: &str) {
-        match self.current_node() {
-            Some(node) => {
-                // TODO: 
-                // ignore the parameter and unpack the current file
-                if node.is_file() {
-                    // self.unpacker.extract_exact(node_name, dest)
-                } else {
-                }
-            }
-            None => return,
+    pub fn unpack(&self, path: &str, dest: &str) -> UnpackResult<()> {
+        if self.current_node().is_some() {
+            let unpack_path = self.position.join("/") + "/" + path;
+            self.unpacker.extract_exact(&unpack_path, dest)?;
         }
+
+        Ok(())
     }
 
-    /// Split the path into a vector of strings
-    fn split_path(&self, path: &str) -> Vec<String> {
-        return Vec::new();
+    /// Unpack the current directory or file
+    pub fn unpack_current(&self, dest: &str) -> UnpackResult<()> {
+        if self.current_node().is_some() {
+            let unpack_path = self.position.join("/");
+            self.unpacker.extract_exact(&unpack_path, dest)?;
+        }
+
+        Ok(())
     }
 }

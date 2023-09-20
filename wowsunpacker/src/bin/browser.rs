@@ -23,8 +23,9 @@ fn main() -> UnpackResult<()> {
     browser.navigate_to("gui");
     browser.navigate_to("4k");
     print_browser_info(&browser);
-    browser.unpack_file("test4k.png");
+    browser.unpack("test4k_2x.png", "output")?;
     browser.go_back();
+    browser.unpack("4k/test4k.png", "output")?;
     browser.navigate_to("bg");
 
     // let's try invalid path
@@ -35,6 +36,8 @@ fn main() -> UnpackResult<()> {
 
     // try a folder with both files and directories
     browser.go_back();
+    browser.navigate_to("dogTags");
+    browser.unpack_current("output")?;
     print_browser_info(&browser);
 
     Ok(())

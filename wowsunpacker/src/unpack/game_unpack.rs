@@ -564,11 +564,10 @@ impl GameUnpacker {
     pub fn extract_exact(&self, node_name: &str, dest: &str) -> UnpackResult<&Self> {
         let node_result = self.directory_tree.find(node_name);
         if node_result.is_none() {
-            warn!(
+            return Err(Box::from(format!(
                 "There exists no node with name {} in directory tree",
                 node_name
-            );
-            return Ok(self);
+            )));
         }
 
         // extract the node
