@@ -290,13 +290,15 @@ impl TreeNode {
         }
     }
 
-    // TODO: this is still not accurate, test `gui/tokens`, it is a directory with a single in it
     pub fn is_file(&self) -> bool {
         match self.file {
             Some(_) => true, // there is a record, 100% file
             None => {
                 match self.nodes.len() {
-                    1 => self.nodes.values().next().unwrap().is_file(), // make sure the only child is a file
+                    1 => {
+                        let child = self.nodes.values().next().unwrap();
+                        child.file.is_some() // 1 child and it is the file
+                    }
                     _ => false, // more than 1 child, 100% directory
                 }
             }
