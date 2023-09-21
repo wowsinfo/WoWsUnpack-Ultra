@@ -8,7 +8,7 @@ pub struct DirectoryBrowser<'a> {
     position: Vec<String>,
 }
 
-impl <'a> DirectoryBrowser<'a> {
+impl<'a> DirectoryBrowser<'a> {
     pub fn new(unpacker: &'a GameUnpacker) -> DirectoryBrowser<'a> {
         return DirectoryBrowser {
             unpacker: unpacker,
@@ -68,6 +68,14 @@ impl <'a> DirectoryBrowser<'a> {
         if self.current_node().is_some() {
             let unpack_path = self.position.join("/");
             self.unpacker.extract_exact(&unpack_path, dest)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn validate_current(&self) -> UnpackResult<()> {
+        if self.current_node().is_none() {
+            return Err("Invalid path".into());
         }
 
         Ok(())

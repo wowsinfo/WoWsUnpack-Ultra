@@ -9,7 +9,11 @@ use crate::{
 };
 use libc::{c_char, c_int};
 
-/// C Structs
+///
+///
+///
+///
+///
 
 #[repr(C)]
 pub struct GameDirectoryList {
@@ -24,7 +28,9 @@ pub struct GameServerList {
 }
 
 ///
-/// Game Directory & Game Server
+///
+///
+///
 ///
 
 /**
@@ -134,7 +140,9 @@ pub extern "C" fn get_first_game_server() -> c_int {
 }
 
 ///
-/// Game Unpacker, Language and Params
+///
+///
+///
 ///
 
 /**
@@ -203,7 +211,20 @@ pub extern "C" fn unpack_game_params(server: c_int, dest: *const c_char) -> c_in
 }
 
 ///
-/// Free
+///
+///
+///
+///
+
+#[no_mangle]
+pub unsafe extern "C" fn placeholder() {
+    
+}
+
+///
+///
+///
+///
 ///
 
 /**
@@ -255,7 +276,9 @@ pub unsafe extern "C" fn free_game_server_list(ptr: *const GameServerList) {
 }
 
 ///
-/// Helper Functions
+///
+///
+///
 ///
 
 unsafe fn convert_cstring_list(
