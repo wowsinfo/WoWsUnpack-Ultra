@@ -8,8 +8,8 @@ pub struct DirectoryBrowser<'a> {
     position: Vec<String>,
 }
 
-impl DirectoryBrowser<'_> {
-    pub fn new(unpacker: &'_ GameUnpacker) -> DirectoryBrowser<'_> {
+impl <'a> DirectoryBrowser<'a> {
+    pub fn new(unpacker: &'a GameUnpacker) -> DirectoryBrowser<'a> {
         return DirectoryBrowser {
             unpacker: unpacker,
             position: Vec::new(),
