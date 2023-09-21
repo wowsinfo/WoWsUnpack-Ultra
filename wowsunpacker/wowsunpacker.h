@@ -54,7 +54,9 @@ typedef struct GameServerList {
 } GameServerList;
 
 /**
- *  * Game Directory & Game Server
+ *
+ * Game Directory & Game Server
+ *
  *  * Get the game directory for a given server  * @param server: The server to get the game directory for  * @return A C string containing the game directory, or NULL if the server is not found
  */
 const char *get_game_directory(int server);
@@ -80,7 +82,15 @@ const struct GameServerList *get_all_game_servers(void);
 int get_first_game_server(void);
 
 /**
- *  * Game Unpacker
+ *
+ * Game Unpacker, Language and Params
+ *
+ *  * Extract all languages from the game data  * @param server: The game server id  * @param dest: The destination directory to extract to  * @return 0 if successful, 1 if not
+ */
+int unpack_languages(int server,
+                     const char *dest);
+
+/**
  *  * Extract a list of entries/paths from the game data  * @param server: The game server id  * @param entries: The list of entries/paths to extract  * @param size: The size of the entries list, Rust doesn't know the size otherwise  * @param dest: The destination directory to extract to  * @return 0 if successful, 1 if not
  */
 int unpack_game_data(int server,
@@ -88,8 +98,12 @@ int unpack_game_data(int server,
                      int size,
                      const char *dest);
 
+int unpack_game_params(int server, const char *dest);
+
 /**
+ *
  * Free
+ *
  *  * Free a C string allocated by Rust [CString]  * @param ptr: The pointer to free  * @return Nothing
  */
 void free_cstring(const char *ptr);

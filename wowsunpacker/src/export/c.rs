@@ -3,6 +3,8 @@ use std::ffi::CString;
 use crate::{
     game::{GameDirectory, GameServer},
     tool::unpack_game_data as unpack_game_data_impl,
+    tool::unpack_game_params as unpack_game_params_impl,
+    tool::unpack_languages as unpack_languages_impl,
     types::UnpackResult,
 };
 use libc::{c_char, c_int};
@@ -21,9 +23,9 @@ pub struct GameServerList {
     pub count: c_int,
 }
 
-/**
- * Game Directory & Game Server
- */
+///
+/// Game Directory & Game Server
+///
 
 /**
  * Get the game directory for a given server
@@ -131,9 +133,28 @@ pub extern "C" fn get_first_game_server() -> c_int {
     servers[0] as c_int
 }
 
+///
+/// Game Unpacker, Language and Params
+///
+
 /**
- * Game Unpacker
+ * Extract all languages from the game data
+ * @param server: The game server id
+ * @param dest: The destination directory to extract to
+ * @return 0 if successful, 1 if not
  */
+#[no_mangle]
+pub extern "C" fn unpack_languages(server: c_int, dest: *const c_char) -> c_int {
+    let server = GameServer::from_number(server);
+    let dest = unsafe { convert_cstring(dest) };
+    if dest.is_err() {
+        return 1;
+    }
+
+    let dest = dest.unwrap();
+    let result = unpack_languages_impl(server, dest.as_str());
+    return result.is_err() as c_int;
+}
 
 /**
  * Extract a list of entries/paths from the game data
@@ -168,7 +189,22 @@ pub extern "C" fn unpack_game_data(
     return result.is_err() as c_int;
 }
 
+#[no_mangle]
+pub extern "C" fn unpack_game_params(server: c_int, dest: *const c_char) -> c_int {
+    let server = GameServer::from_number(server);
+    let dest = unsafe { convert_cstring(dest) };
+    if dest.is_err() {
+        return 1;
+    }
+
+    let dest = dest.unwrap();
+    let result = unpack_game_params_impl(server, dest.as_str());
+    return result.is_err() as c_int;
+}
+
+///
 /// Free
+///
 
 /**
  * Free a C string allocated by Rust [CString]
@@ -218,9 +254,9 @@ pub unsafe extern "C" fn free_game_server_list(ptr: *const GameServerList) {
     let _ = std::slice::from_raw_parts(list.list, list.count as usize);
 }
 
-/**
- * Helper Functions
- */
+///
+/// Helper Functions
+///
 
 unsafe fn convert_cstring_list(
     list: *const *const c_char,
