@@ -49,24 +49,62 @@ fn prompt() -> UnpackResult<()> {
     Ok(())
 }
 
+fn print_help() {
+    println!("Supported commands:");
+    println!("- cd <path>\t\t\tNavigate to a directory");
+    println!("- ls [file|directory]\t\tList files or directories");
+    println!("- extract <path> <output>\tExtract a file or directory");
+    println!("- exit\t\t\t\tExit the program\n");
+}
+
+fn pretty_print_list(list: &Vec<&String>) {
+    for item in list {
+        print!("{}  ", item);
+    }
+    println!();
+}
+
 fn main() -> UnpackResult<()> {
     setup_logger("warn", "warn");
 
     // _test_browser();
 
     // get input until user types "> exit"
-    println!("Supported commands:");
-    println!("- cd <path>\t\t\tNavigate to a directory");
-    println!("- ls [file|directory]\t\tList files or directories");
-    println!("- extract <path> <output>\tExtract a file or directory");
-    println!("- exit\t\t\t\tExit the program\n");
+    print_help();
 
     // Get the first available game directory
-    print!("Locating game directory from");
     let directory = GameDirectory::available_path();
-    let first_directory = directory.first().expect("No game directory found");
-    let mut unpacker = GameUnpacker::auto(first_directory)?;
-    println!(" {}...", first_directory);
+    let selected_directory = match directory.len() {
+        0 => {
+            println!("No game directory found");
+            // exit if no game directory is found
+            return Ok(());
+        },
+        1 => {
+            directory.first()
+        },
+        _ => {
+            println!("Multiple locations found!");
+            println!("Please select a game directory:");
+            for (index, dir) in directory.iter().enumerate() {
+                println!("{}. {}", index + 1, dir);
+            }
+            print!("> ");
+            stdout().flush()?;
+            let mut user_input = String::new();
+            stdin().read_line(&mut user_input)?;
+            let index = user_input.trim().parse::<usize>().expect("Invalid input, please enter a number");
+            // validate index
+            if index > directory.len() || index == 0 {
+                println!("Your input is out of range");
+                return Ok(());
+            }
+            directory.get(index - 1)
+        }
+    }.expect("No game directory found");
+
+    let mut unpacker = GameUnpacker::auto(selected_directory)?;
+    println!("Unpacking {}...", selected_directory);
     unpacker.build_directory_tree()?;
     let mut browser = DirectoryBrowser::new(&unpacker);
 
@@ -90,21 +128,21 @@ fn main() -> UnpackResult<()> {
                             if browser.validate_current().is_err() {
                                 println!("Invalid path: {}", path);
                                 browser.go_back();
-                                println!("{:?}", browser.directory_list());
+                                pretty_print_list(&browser.directory_list());
                             }
                         }
                     }
                     Some("ls") => {
                         if let Some(arg) = args.next() {
                             match arg {
-                                "file" => println!("{:?}", browser.file_list()),
-                                "directory" => println!("{:?}", browser.directory_list()),
+                                "file" => pretty_print_list(&browser.file_list()),
+                                "directory" => pretty_print_list(&browser.directory_list()),
                                 _ => println!("Invalid argument"),
                             }
                         } else {
                             // Print both by default
-                            println!("{:?}", browser.directory_list());
-                            println!("{:?}", browser.file_list());
+                            pretty_print_list(&browser.directory_list());
+                            pretty_print_list(&browser.file_list());
                         }
                     }
                     Some("extract") => {
